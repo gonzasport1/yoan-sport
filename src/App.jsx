@@ -76,6 +76,7 @@ const GLOBAL_CSS = `
   .ticker span{ font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--muted); padding:0 28px; letter-spacing:0.5px; display:inline-flex; align-items:center; gap:8px; }
   .ticker span b{ color:var(--teal-bright); font-weight:700; }
   .up{color:#5be89a;} .down{color:#ff6b6b;}
+  .ticker-logo{ width:14px; height:14px; object-fit:contain; vertical-align:middle; margin:0 3px; border-radius:2px; }
   @keyframes scroll-left{ 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
   nav.ln-nav{ position:relative; z-index:2; display:flex; justify-content:space-between; align-items:center; padding:22px 5vw 0; max-width:1180px; margin:0 auto; }
   .nav-mark{ font-family:'Bebas Neue', sans-serif; font-size:20px; letter-spacing:3px; color:var(--text); text-transform:uppercase; }
@@ -225,22 +226,61 @@ export default function App() {
 }
 
 function Ticker() {
-  const items = [
+  const [items, setItems] = useState([]);
+  const [triedLoad, setTriedLoad] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const res = await fetch("/api/live-scores");
+        const data = await res.json();
+        if (active) setItems(Array.isArray(data.items) ? data.items : []);
+      } catch (err) {
+        // se ignora: si falla, se muestra el ticker de ejemplo más abajo
+      } finally {
+        if (active) setTriedLoad(true);
+      }
+    }
+    load();
+    const id = setInterval(load, 60000); // se actualiza cada 60s
+    return () => { active = false; clearInterval(id); };
+  }, []);
+
+  if (items.length > 0) {
+    const doubled = [...items, ...items];
+    return (
+      <div className="ticker">
+        <div className="ticker-track">
+          {doubled.map((it, i) => (
+            <span key={i}>
+              <b>{it.sport}</b>
+              {it.homeLogo && <img src={it.homeLogo} alt="" className="ticker-logo" />}
+              {it.homeName} {it.homeScore ?? "-"}—{it.awayScore ?? "-"} {it.awayName}
+              {it.awayLogo && <img src={it.awayLogo} alt="" className="ticker-logo" />}
+              <span className="up">{it.status}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback (mientras carga, o si no hay partidos en vivo ahora mismo)
+  const demo = [
     { tag: "NRFI", label: "LAD @ SF", val: "62%", cls: "up" },
     { tag: "F5", label: "NYY -1.5", val: "58%", cls: "up" },
     { tag: "TT", label: "ATL o4.5", val: "44%", cls: "down" },
     { tag: "NRFI", label: "HOU @ SEA", val: "67%", cls: "up" },
     { tag: "MUNDIAL", label: "ESP vs FRA — xGA 1.2", val: "71%", cls: "up" },
-    { tag: "F5", label: "CHC -1", val: "55%", cls: "up" },
-    { tag: "TT", label: "MIL u3.5", val: "60%", cls: "up" },
   ];
-  const doubled = [...items, ...items];
+  const doubledDemo = [...demo, ...demo];
   return (
     <div className="ticker">
       <div className="ticker-track">
-        {doubled.map((it, i) => (
+        {doubledDemo.map((it, i) => (
           <span key={i}>
-            <b>{it.tag}</b> {it.label} <span className={it.cls}>{it.val}</span>
+            <b>{it.tag}</b> {it.label} <span className={it.cls}>{triedLoad ? "sin partidos en vivo" : it.val}</span>
           </span>
         ))}
       </div>

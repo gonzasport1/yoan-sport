@@ -25,8 +25,6 @@ async function sb(path, options = {}) {
 }
 
 const getSettings = () => sb("settings?id=eq.1&select=*").then((r) => r?.[0]);
-const updateSettings = (patch) =>
-  sb("settings?id=eq.1", { method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify(patch) });
 
 const getFreeSubs = () => sb("free_subs?select=*&order=created_at.desc");
 const insertFreeSub = (email) =>
@@ -35,9 +33,28 @@ const insertFreeSub = (email) =>
 const getPremiumSubs = () => sb("premium_subs?select=*&order=created_at.desc");
 const insertPremiumSub = (entry) =>
   sb("premium_subs", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(entry) });
-const updatePremiumStatus = (email, status) =>
-  sb(`premium_subs?email=eq.${encodeURIComponent(email)}`, { method: "PATCH", body: JSON.stringify({ status }) });
 const searchPremiumByEmail = (email) => sb(`premium_subs?email=eq.${encodeURIComponent(email)}&select=*&order=created_at.desc`);
+
+// Escrituras de administrador: pasan por el servidor, que valida la contraseña
+// contra una variable de entorno y usa la clave secreta de Supabase — nunca
+// se hacen directo desde el navegador con la clave pública.
+async function adminWrite(password, action, payload) {
+  const res = await fetch("/api/admin-write", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password, action, ...payload }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || "Error de autorización");
+  return res.json();
+}
+async function adminLogin(password) {
+  const res = await fetch("/api/admin-login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ password }),
+  });
+  return res.ok;
+}
 
 const GLOBAL_CSS = `
   :root{
@@ -175,6 +192,7 @@ export default function App() {
   const [freeSubs, setFreeSubs] = useState([]);
   const [premiumSubs, setPremiumSubs] = useState([]);
   const [view, setView] = useState("public");
+  const [adminPassword, setAdminPassword] = useState("");
   const [dbError, setDbError] = useState("");
   const [loaded, setLoaded] = useState(false);
 
@@ -221,20 +239,26 @@ export default function App() {
           goAdmin={() => setView("admin-login")}
         />
       )}
-      {view === "admin-login" && <AdminLogin onBack={() => setView("public")} onSuccess={() => setView("admin")} />}
+      {view === "admin-login" && (
+        <AdminLogin
+          onBack={() => setView("public")}
+          onSuccess={(pw) => { setAdminPassword(pw); setView("admin"); }}
+        />
+      )}
       {view === "admin" && (
         <AdminPanel
           loaded={loaded}
           dbError={dbError}
+          adminPassword={adminPassword}
           freePick={freePick} setFreePick={setFreePick}
           premiumPick={premiumPick} setPremiumPick={setPremiumPick}
           zelleInfo={zelleInfo} setZelleInfo={setZelleInfo}
           winRate={winRate} setWinRate={setWinRate}
           baseMembers={baseMembers} setBaseMembers={setBaseMembers}
           freeSubs={freeSubs} premiumSubs={premiumSubs}
-          onApprove={async (email) => { await updatePremiumStatus(email, "approved"); setPremiumSubs((s) => s.map((p) => (p.email === email ? { ...p, status: "approved" } : p))); }}
-          onReject={async (email) => { await updatePremiumStatus(email, "rejected"); setPremiumSubs((s) => s.map((p) => (p.email === email ? { ...p, status: "rejected" } : p))); }}
-          onExit={() => setView("public")}
+          onApprove={async (email) => { await adminWrite(adminPassword, "premium-status", { email, status: "approved" }); setPremiumSubs((s) => s.map((p) => (p.email === email ? { ...p, status: "approved" } : p))); }}
+          onReject={async (email) => { await adminWrite(adminPassword, "premium-status", { email, status: "rejected" }); setPremiumSubs((s) => s.map((p) => (p.email === email ? { ...p, status: "rejected" } : p))); }}
+          onExit={() => { setView("public"); setAdminPassword(""); }}
         />
       )}
     </div>
@@ -564,9 +588,22 @@ function StatusLookup({ premiumPick, onBack }) {
 function AdminLogin({ onBack, onSuccess }) {
   const [pw, setPw] = useState("");
   const [error, setError] = useState("");
-  function submit(e) {
+  const [checking, setChecking] = useState(false);
+
+  async function submit(e) {
     e.preventDefault();
-    if (pw.trim() === "admin110520") { setError(""); onSuccess(); } else { setError("Contraseña incorrecta."); }
+    if (checking) return;
+    setChecking(true);
+    setError("");
+    try {
+      const ok = await adminLogin(pw.trim());
+      if (ok) onSuccess(pw.trim());
+      else setError("Contraseña incorrecta.");
+    } catch (err) {
+      setError("No se pudo verificar. Probá de nuevo.");
+    } finally {
+      setChecking(false);
+    }
   }
   return (
     <div className="panel" style={{ maxWidth: 340, textAlign: "center" }}>
@@ -578,12 +615,11 @@ function AdminLogin({ onBack, onSuccess }) {
           type="password"
           value={pw}
           onChange={(e) => setPw(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") submit(e); }}
           placeholder="Contraseña"
           autoFocus
         />
         {error && <p style={{ color: "#ff6b6b", fontSize: 12, marginBottom: 12 }}>{error}</p>}
-        <button className="btn solid" type="submit" onClick={submit}>Entrar</button>
+        <button className="btn solid" type="submit" disabled={checking}>{checking ? "Verificando..." : "Entrar"}</button>
         <button type="button" className="link-row" style={{ marginTop: 10, justifyContent: "center" }} onClick={onBack}>Volver al sitio</button>
       </form>
     </div>
@@ -599,7 +635,7 @@ function copyToClipboard(text) {
   if (navigator.clipboard) navigator.clipboard.writeText(text);
 }
 
-function AdminPanel({ loaded, dbError, freePick, setFreePick, premiumPick, setPremiumPick, zelleInfo, setZelleInfo, winRate, setWinRate, baseMembers, setBaseMembers, freeSubs, premiumSubs, onApprove, onReject, onExit }) {
+function AdminPanel({ loaded, dbError, adminPassword, freePick, setFreePick, premiumPick, setPremiumPick, zelleInfo, setZelleInfo, winRate, setWinRate, baseMembers, setBaseMembers, freeSubs, premiumSubs, onApprove, onReject, onExit }) {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const approvedPremiumEmails = premiumSubs.filter((p) => p.status === "approved").map((p) => p.email);
@@ -619,14 +655,16 @@ function AdminPanel({ loaded, dbError, freePick, setFreePick, premiumPick, setPr
     setSaving(true);
     setSavedMsg("");
     try {
-      await updateSettings({
-        free_pick: freePick,
-        premium_pick: premiumPick,
-        zelle_name: zelleInfo.name,
-        zelle_handle: zelleInfo.handle,
-        zelle_price: zelleInfo.price,
-        win_rate: winRate,
-        base_members: Number(baseMembers) || 0,
+      await adminWrite(adminPassword, "settings", {
+        settings: {
+          free_pick: freePick,
+          premium_pick: premiumPick,
+          zelle_name: zelleInfo.name,
+          zelle_handle: zelleInfo.handle,
+          zelle_price: zelleInfo.price,
+          win_rate: winRate,
+          base_members: Number(baseMembers) || 0,
+        },
       });
       setSavedMsg("Guardado ✓");
     } catch (err) {

@@ -1,4 +1,4 @@
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const API_KEY = process.env.API_FOOTBALL_KEY;
 
   if (!API_KEY) {

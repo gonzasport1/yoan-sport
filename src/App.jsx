@@ -490,7 +490,7 @@ function AdminLogin({ onBack, onSuccess }) {
   const [error, setError] = useState("");
   function submit(e) {
     e.preventDefault();
-    if (pw.trim() === "admin110520") { setError(""); onSuccess(); } else { setError("Contraseña incorrecta. Probá: admin110520"); }
+    if (pw.trim() === "admin110520") { setError(""); onSuccess(); } else { setError("Contraseña incorrecta."); }
   }
   return (
     <div className="panel" style={{ maxWidth: 340, textAlign: "center" }}>

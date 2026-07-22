@@ -132,6 +132,16 @@ const GLOBAL_CSS = `
   .pill-approve{ font-size:11px; background:rgba(91,232,154,0.12); color:#5be89a; border:1px solid rgba(91,232,154,0.3); padding:6px 12px; border-radius:20px; cursor:pointer; }
   .pill-reject{ font-size:11px; background:rgba(255,107,107,0.12); color:#ff6b6b; border:1px solid rgba(255,107,107,0.3); padding:6px 12px; border-radius:20px; cursor:pointer; }
   .banner-error{ background:rgba(255,107,107,0.1); border:1px solid rgba(255,107,107,0.3); color:#ff9b9b; font-size:12px; padding:10px 14px; border-radius:10px; margin-bottom:16px; }
+  .corner-summary{ position:fixed; bottom:20px; right:20px; z-index:50; width:270px; background:rgba(8,12,14,0.92); backdrop-filter:blur(14px); border:1px solid rgba(18,214,196,0.25); border-radius:14px; padding:14px 16px; box-shadow:0 12px 40px -10px rgba(0,0,0,0.6); }
+  .corner-summary-head{ font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:1.5px; color:var(--teal-bright); text-transform:uppercase; display:flex; align-items:center; gap:6px; margin-bottom:10px; }
+  .corner-summary-row{ display:flex; align-items:flex-start; gap:8px; margin-bottom:8px; }
+  .corner-summary-row:last-child{ margin-bottom:0; }
+  .corner-summary-tag{ font-size:9px; font-weight:700; letter-spacing:1px; padding:3px 6px; border-radius:5px; flex-shrink:0; margin-top:1px; }
+  .corner-summary-tag.free{ background:rgba(255,255,255,0.08); color:var(--muted); }
+  .corner-summary-tag.premium{ background:rgba(232,182,73,0.15); color:var(--gold); }
+  .corner-summary-text{ font-size:12px; color:var(--text); line-height:1.4; }
+  .corner-summary-text.locked{ color:var(--muted); font-style:italic; }
+  @media (max-width: 640px){ .corner-summary{ left:16px; right:16px; width:auto; bottom:16px; } }
 `;
 
 function Check() {
@@ -160,6 +170,8 @@ export default function App() {
   const [freePick, setFreePick] = useState("Cargando...");
   const [premiumPick, setPremiumPick] = useState("Cargando...");
   const [zelleInfo, setZelleInfo] = useState({ handle: "", name: "", price: "" });
+  const [winRate, setWinRate] = useState("62%");
+  const [baseMembers, setBaseMembers] = useState(20);
   const [freeSubs, setFreeSubs] = useState([]);
   const [premiumSubs, setPremiumSubs] = useState([]);
   const [view, setView] = useState("public");
@@ -173,6 +185,8 @@ export default function App() {
         setFreePick(settings.free_pick);
         setPremiumPick(settings.premium_pick);
         setZelleInfo({ name: settings.zelle_name, handle: settings.zelle_handle, price: settings.zelle_price });
+        if (settings.win_rate) setWinRate(settings.win_rate);
+        if (settings.base_members != null) setBaseMembers(settings.base_members);
       }
       setFreeSubs(free || []);
       setPremiumSubs(premium || []);
@@ -200,8 +214,8 @@ export default function App() {
           premiumPick={premiumPick}
           zelleInfo={zelleInfo}
           dbError={dbError}
-          freeCount={freeSubs.length}
-          premiumApprovedCount={premiumSubs.filter((p) => p.status === "approved").length}
+          winRate={winRate}
+          membersCount={baseMembers + freeSubs.length + premiumSubs.filter((p) => p.status === "approved").length}
           onFreeRegistered={(email) => setFreeSubs((s) => [{ email }, ...s])}
           onPremiumRegistered={(entry) => setPremiumSubs((s) => [{ ...entry, status: "pending" }, ...s])}
           goAdmin={() => setView("admin-login")}
@@ -215,6 +229,8 @@ export default function App() {
           freePick={freePick} setFreePick={setFreePick}
           premiumPick={premiumPick} setPremiumPick={setPremiumPick}
           zelleInfo={zelleInfo} setZelleInfo={setZelleInfo}
+          winRate={winRate} setWinRate={setWinRate}
+          baseMembers={baseMembers} setBaseMembers={setBaseMembers}
           freeSubs={freeSubs} premiumSubs={premiumSubs}
           onApprove={async (email) => { await updatePremiumStatus(email, "approved"); setPremiumSubs((s) => s.map((p) => (p.email === email ? { ...p, status: "approved" } : p))); }}
           onReject={async (email) => { await updatePremiumStatus(email, "rejected"); setPremiumSubs((s) => s.map((p) => (p.email === email ? { ...p, status: "rejected" } : p))); }}
@@ -288,7 +304,7 @@ function Ticker() {
   );
 }
 
-function PublicSite({ freePick, premiumPick, zelleInfo, dbError, freeCount, premiumApprovedCount, onFreeRegistered, onPremiumRegistered, goAdmin }) {
+function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, membersCount, onFreeRegistered, onPremiumRegistered, goAdmin }) {
   const [tab, setTab] = useState(null);
 
   return (
@@ -312,8 +328,8 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, freeCount, prem
 
       {tab === null && (
         <div className="scoreboard">
-          <div className="cell"><div className="num">62%</div><div className="lbl">Acierto 7D</div></div>
-          <div className="cell"><div className="num">{freeCount + premiumApprovedCount}</div><div className="lbl">Miembros</div></div>
+          <div className="cell"><div className="num">{winRate}</div><div className="lbl">Acierto 7D</div></div>
+          <div className="cell"><div className="num">{membersCount}</div><div className="lbl">Miembros</div></div>
           <div className="cell"><div className="num">3</div><div className="lbl">Mercados</div></div>
           <div className="cell"><div className="num">24h</div><div className="lbl">Verificación</div></div>
         </div>
@@ -357,11 +373,31 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, freeCount, prem
         </div>
       )}
 
+      {tab === null && <CornerSummary freePick={freePick} premiumPick={premiumPick} />}
+
       <footer className="site-footer">
         <span>© 2026 {BRAND}</span>
         <button onClick={goAdmin}>ADMIN</button>
       </footer>
     </>
+  );
+}
+
+function CornerSummary({ freePick, premiumPick }) {
+  return (
+    <div className="corner-summary">
+      <div className="corner-summary-head">
+        <span className="dot-live" /> RESUMEN DE HOY
+      </div>
+      <div className="corner-summary-row">
+        <span className="corner-summary-tag free">FREE</span>
+        <span className="corner-summary-text">{freePick}</span>
+      </div>
+      <div className="corner-summary-row">
+        <span className="corner-summary-tag premium">PREMIUM</span>
+        <span className="corner-summary-text">{premiumPick}</span>
+      </div>
+    </div>
   );
 }
 
@@ -563,7 +599,7 @@ function copyToClipboard(text) {
   if (navigator.clipboard) navigator.clipboard.writeText(text);
 }
 
-function AdminPanel({ loaded, dbError, freePick, setFreePick, premiumPick, setPremiumPick, zelleInfo, setZelleInfo, freeSubs, premiumSubs, onApprove, onReject, onExit }) {
+function AdminPanel({ loaded, dbError, freePick, setFreePick, premiumPick, setPremiumPick, zelleInfo, setZelleInfo, winRate, setWinRate, baseMembers, setBaseMembers, freeSubs, premiumSubs, onApprove, onReject, onExit }) {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const approvedPremiumEmails = premiumSubs.filter((p) => p.status === "approved").map((p) => p.email);
@@ -589,6 +625,8 @@ function AdminPanel({ loaded, dbError, freePick, setFreePick, premiumPick, setPr
         zelle_name: zelleInfo.name,
         zelle_handle: zelleInfo.handle,
         zelle_price: zelleInfo.price,
+        win_rate: winRate,
+        base_members: Number(baseMembers) || 0,
       });
       setSavedMsg("Guardado ✓");
     } catch (err) {
@@ -623,6 +661,19 @@ function AdminPanel({ loaded, dbError, freePick, setFreePick, premiumPick, setPr
           <input className="ln-input" style={{ marginBottom: 0 }} value={zelleInfo.name} onChange={(e) => setZelleInfo((z) => ({ ...z, name: e.target.value }))} placeholder="Nombre" />
           <input className="ln-input" style={{ marginBottom: 0 }} value={zelleInfo.handle} onChange={(e) => setZelleInfo((z) => ({ ...z, handle: e.target.value }))} placeholder="Email o teléfono Zelle" />
           <input className="ln-input" style={{ marginBottom: 0 }} value={zelleInfo.price} onChange={(e) => setZelleInfo((z) => ({ ...z, price: e.target.value }))} placeholder="Precio" />
+        </div>
+      </div>
+      <div className="box">
+        <label className="field-label">Estadísticas mostradas en la página principal</label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div>
+            <label className="field-label" style={{ marginTop: 0 }}>% Acierto 7D</label>
+            <input className="ln-input" style={{ marginBottom: 0 }} value={winRate} onChange={(e) => setWinRate(e.target.value)} placeholder="62%" />
+          </div>
+          <div>
+            <label className="field-label" style={{ marginTop: 0 }}>Miembros base (arranca acá, después suma los reales)</label>
+            <input className="ln-input" style={{ marginBottom: 0 }} type="number" value={baseMembers} onChange={(e) => setBaseMembers(e.target.value)} placeholder="20" />
+          </div>
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 30 }}>

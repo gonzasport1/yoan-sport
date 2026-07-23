@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, CreditCard, Upload, ArrowLeft, Lock, LogOut, Mail, CheckCircle2, Clock } from "lucide-react";
+import { Search, CreditCard, Upload, ArrowLeft, Lock, LogOut, Mail, CheckCircle2, Clock, TrendingUp, Target, ShieldCheck, PieChart } from "lucide-react";
 
 const GMAIL_RE = /^[^\s@]+@gmail\.com$/i;
 const BRAND = "Yoan Sport";
@@ -100,7 +100,35 @@ const GLOBAL_CSS = `
   .nav-status{ font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--muted); display:flex; align-items:center; gap:7px; }
   .dot-live{ width:6px;height:6px;border-radius:50%; background:#5be89a; box-shadow:0 0 8px #5be89a; animation:pulse 1.8s ease-in-out infinite; }
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
-  header.hero{ position:relative; z-index:2; max-width:1180px; margin:0 auto; padding:70px 5vw 40px; text-align:center; }
+  header.hero{ position:relative; z-index:2; max-width:1180px; margin:0 auto; padding:70px 5vw 40px; text-align:center; overflow:hidden; }
+  header.hero::before{
+    content:"";
+    position:absolute; inset:-20% -10%;
+    background:
+      radial-gradient(ellipse 480px 220px at 12% 8%, rgba(18,214,196,0.10), transparent 60%),
+      linear-gradient(115deg, transparent 58%, rgba(232,182,73,0.10) 59%, transparent 60%),
+      linear-gradient(115deg, transparent 63%, rgba(18,214,196,0.14) 64%, transparent 65%),
+      linear-gradient(115deg, transparent 67%, rgba(18,214,196,0.07) 67.6%, transparent 68.2%);
+    pointer-events:none; z-index:-1;
+  }
+  .hero-decor{ position:absolute; top:8px; display:none; width:150px; }
+  @media (min-width: 980px){ .hero-decor{ display:block; } }
+  .hero-decor-left{ left:0; text-align:left; }
+  .hero-decor-right{ right:0; text-align:right; }
+  .hero-decor-label{ font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:2px; color:var(--muted); margin-bottom:12px; text-transform:uppercase; }
+  .hero-metric-row{ display:flex; align-items:center; gap:8px; margin-bottom:7px; }
+  .hero-metric-label{ font-size:10px; color:var(--muted); width:34px; font-family:'JetBrains Mono', monospace; }
+  .hero-metric-bar{ width:76px; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; }
+  .hero-metric-fill{ height:100%; background:linear-gradient(90deg, var(--teal-bright), rgba(18,214,196,0.3)); }
+  .hero-chart{ width:120px; height:50px; }
+  .hero-badge{ display:inline-block; margin-top:6px; font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--teal-bright); background:rgba(18,214,196,0.08); border:1px solid rgba(18,214,196,0.25); padding:3px 8px; border-radius:6px; }
+  .hero-features{ display:flex; justify-content:center; gap:34px; flex-wrap:wrap; margin-top:38px; padding-top:26px; border-top:1px solid rgba(255,255,255,0.07); }
+  .hero-feature{ display:flex; align-items:center; gap:9px; }
+  .hero-feature svg{ color:var(--teal-bright); flex-shrink:0; }
+  .hero-feature strong{ display:block; font-size:11px; letter-spacing:0.8px; color:var(--text); }
+  .hero-feature span{ display:block; font-size:10px; color:var(--muted); margin-top:1px; }
+  .brand-word-1{ background:linear-gradient(180deg, #ffffff 10%, #b9c9c6 55%, #6f8a85 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .brand-word-2{ background:linear-gradient(180deg, #7fe0d4 0%, var(--teal-bright) 55%, #0ea89b 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
   .eyebrow{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:4px; color:var(--gold); text-transform:uppercase; margin-bottom:18px; display:inline-flex; align-items:center; gap:10px; }
   .eyebrow::before, .eyebrow::after{ content:""; width:22px; height:1px; background:var(--gold-dim); }
   h1.wordmark{ font-family:'Bebas Neue', sans-serif; font-size: clamp(40px, 9vw, 76px); line-height:1; letter-spacing:3px; text-transform:uppercase; background:linear-gradient(180deg, #ffffff 10%, #b9c9c6 55%, #6f8a85 100%); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 0 40px rgba(18,214,196,0.18)); margin-bottom:6px; }
@@ -341,14 +369,38 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
       </nav>
 
       <header className="hero">
+        <div className="hero-decor hero-decor-left">
+          <div className="hero-decor-label">DATA ANALYTICS</div>
+          {[["xG", 78], ["xGA", 55], ["wRC+", 66], ["ERA", 32]].map(([label, pct]) => (
+            <div className="hero-metric-row" key={label}>
+              <span className="hero-metric-label">{label}</span>
+              <div className="hero-metric-bar"><div className="hero-metric-fill" style={{ width: `${pct}%` }} /></div>
+            </div>
+          ))}
+        </div>
+
+        <div className="hero-decor hero-decor-right">
+          <svg viewBox="0 0 120 50" className="hero-chart">
+            <polyline points="0,40 15,32 30,36 45,20 60,26 75,10 90,16 105,6 120,12" fill="none" stroke="var(--teal-bright)" strokeWidth="2" />
+          </svg>
+          <span className="hero-badge">+1.82</span>
+        </div>
+
         <div className="eyebrow">Análisis Sabermétrico</div>
-        <h1 className="wordmark">{BRAND}</h1>
+        <h1 className="wordmark"><span className="brand-word-1">Yoan</span> <span className="brand-word-2">Sport</span></h1>
         <div className="subline">Picks &amp; Análisis Deportivo</div>
         <p className="hero-desc">
           Dashboards diarios de MLB y fútbol construidos sobre datos verificados — ERA, wRC+, xG, xGA — no
           corazonadas. Tú decides la línea, nosotros hacemos los números.
         </p>
         {dbError && <p className="banner-error" style={{ maxWidth: 420, margin: "16px auto 0" }}>{dbError}</p>}
+
+        <div className="hero-features">
+          <div className="hero-feature"><TrendingUp size={18} /><div><strong>DATOS REALES</strong><span>Decisiones inteligentes</span></div></div>
+          <div className="hero-feature"><Target size={18} /><div><strong>ANÁLISIS PROFESIONAL</strong><span>Ventaja a largo plazo</span></div></div>
+          <div className="hero-feature"><ShieldCheck size={18} /><div><strong>DISCIPLINA</strong><span>Gestión de riesgo</span></div></div>
+          <div className="hero-feature"><PieChart size={18} /><div><strong>RESULTADOS</strong><span>Consistentes</span></div></div>
+        </div>
       </header>
 
       {tab === null && (

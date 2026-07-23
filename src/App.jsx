@@ -159,6 +159,7 @@ const GLOBAL_CSS = `
   .corner-summary-text{ font-size:12px; color:var(--text); line-height:1.4; }
   .corner-summary-text.locked{ color:var(--muted); font-style:italic; }
   @media (max-width: 640px){ .corner-summary{ left:16px; right:16px; width:auto; bottom:16px; } }
+  .legal-disclaimer{ position:relative; z-index:2; max-width:680px; margin:0 auto; padding:0 5vw 20px; text-align:center; font-size:11px; color:var(--muted); line-height:1.6; }
 `;
 
 function Check() {
@@ -381,6 +382,7 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
             </ul>
             <button className="btn solid" onClick={() => setTab("premium")}>Quiero premium →</button>
             <div className="pay-note">Verificación manual en menos de 24h</div>
+            <div className="pay-note" style={{ marginTop: 4 }}>+18 · Apostar conlleva riesgo, no hay resultados garantizados</div>
           </div>
         </main>
       )}
@@ -398,6 +400,11 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
       )}
 
       {tab === null && <CornerSummary freePick={freePick} premiumPick={premiumPick} />}
+
+      <p className="legal-disclaimer">
+        Contenido con fines informativos y de entretenimiento. No garantiza resultados ni ganancias. Apostar
+        conlleva riesgo — hacelo de forma responsable. Servicio dirigido a mayores de 18 años.
+      </p>
 
       <footer className="site-footer">
         <span>© 2026 {BRAND}</span>

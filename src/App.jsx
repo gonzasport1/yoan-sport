@@ -1,6 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { Search, CreditCard, Upload, ArrowLeft, Lock, LogOut, Mail, CheckCircle2, Clock, TrendingUp, Target, ShieldCheck, PieChart } from "lucide-react";
 
+const TREND_LEAGUES = [
+  { id: 39, name: "Premier League", flag: "🏴" },
+  { id: 140, name: "La Liga", flag: "🇪🇸" },
+  { id: 78, name: "Bundesliga", flag: "🇩🇪" },
+  { id: 135, name: "Serie A", flag: "🇮🇹" },
+  { id: 61, name: "Ligue 1", flag: "🇫🇷" },
+  { id: 2, name: "Champions League", flag: "🇪🇺" },
+  { id: 71, name: "Brasileirão", flag: "🇧🇷" },
+  { id: 262, name: "Liga MX", flag: "🇲🇽" },
+];
+const FREE_TREND_PREVIEWS = 2; // cuántos partidos se ven gratis antes del candado
+
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  return r.json();
+}
+
 const GMAIL_RE = /^[^\s@]+@gmail\.com$/i;
 const BRAND = "Yoan Sport";
 
@@ -188,6 +205,35 @@ const GLOBAL_CSS = `
   .corner-summary-text.locked{ color:var(--muted); font-style:italic; }
   @media (max-width: 640px){ .corner-summary{ left:16px; right:16px; width:auto; bottom:16px; } }
   .legal-disclaimer{ position:relative; z-index:2; max-width:680px; margin:0 auto; padding:0 5vw 20px; text-align:center; font-size:11px; color:var(--muted); line-height:1.6; }
+  .trends-section{ position:relative; z-index:2; max-width:960px; margin:44px auto 0; padding:0 5vw; }
+  .trends-section-head{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:6px; }
+  .trends-title{ font-family:'Bebas Neue', sans-serif; font-size:24px; letter-spacing:1px; color:var(--text); }
+  .trends-subtitle{ color:var(--muted); font-size:12.5px; margin-bottom:16px; }
+  .league-select{ background:var(--card); border:1px solid rgba(255,255,255,0.12); color:var(--text); border-radius:8px; padding:8px 12px; font-size:12.5px; }
+  .trends-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:640px){ .trends-grid{ grid-template-columns:1fr; } }
+  .trends-card{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid rgba(255,255,255,0.08); border-radius:12px; background:var(--card); cursor:pointer; transition:border-color .15s; }
+  .trends-card:hover{ border-color:var(--teal-bright); }
+  .trends-card.locked{ opacity:0.75; }
+  .trends-card.locked:hover{ border-color:var(--gold); }
+  .trends-card-teams{ display:flex; flex-direction:column; gap:5px; font-size:12.5px; }
+  .trends-card-teams span{ display:flex; align-items:center; gap:6px; }
+  .trends-card-teams img{ width:16px; height:16px; object-fit:contain; }
+  .trends-cta{ font-size:11px; color:var(--teal-bright); font-weight:600; white-space:nowrap; }
+  .trends-lock{ font-size:11px; color:var(--gold); font-weight:600; display:flex; align-items:center; gap:4px; white-space:nowrap; }
+  .trends-matchup{ display:flex; align-items:center; justify-content:center; gap:18px; margin-bottom:26px; }
+  .trends-matchup-team{ display:flex; flex-direction:column; align-items:center; gap:8px; font-family:'Bebas Neue', sans-serif; font-size:16px; letter-spacing:0.5px; }
+  .trends-matchup-team img{ width:36px; height:36px; object-fit:contain; }
+  .trends-vs{ color:var(--muted); font-size:11px; font-family:'JetBrains Mono', monospace; }
+  .trends-team-columns{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media (max-width:640px){ .trends-team-columns{ grid-template-columns:1fr; } }
+  .trend-stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+  .trend-stat-box{ background:rgba(0,0,0,0.25); border-radius:8px; padding:10px; text-align:center; }
+  .trend-stat-num{ font-family:'Bebas Neue', sans-serif; font-size:22px; color:var(--teal-bright); }
+  .trend-stat-lbl{ font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px; }
+  .ln-table{ width:100%; border-collapse:collapse; font-size:11px; margin-top:6px; }
+  .ln-table th{ text-align:left; color:var(--muted); font-weight:500; padding:5px 4px; border-bottom:1px solid rgba(255,255,255,0.08); font-size:10px; text-transform:uppercase; }
+  .ln-table td{ padding:6px 4px; border-bottom:1px solid rgba(255,255,255,0.04); }
 `;
 
 function Check() {
@@ -359,6 +405,34 @@ function Ticker() {
 
 function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, membersCount, onFreeRegistered, onPremiumRegistered, goAdmin }) {
   const [tab, setTab] = useState(null);
+  const [trendLeague, setTrendLeague] = useState(TREND_LEAGUES[0].id);
+  const [trendFixtures, setTrendFixtures] = useState([]);
+  const [loadingFixtures, setLoadingFixtures] = useState(true);
+  const [selectedFixture, setSelectedFixture] = useState(null);
+  const [homeTrends, setHomeTrends] = useState(null);
+  const [awayTrends, setAwayTrends] = useState(null);
+  const [loadingTrends, setLoadingTrends] = useState(false);
+
+  useEffect(() => {
+    setLoadingFixtures(true);
+    fetchJSON(`/api/fixtures?league=${trendLeague}`)
+      .then((data) => setTrendFixtures(data.items || []))
+      .finally(() => setLoadingFixtures(false));
+  }, [trendLeague]);
+
+  function openFixture(fixture) {
+    setSelectedFixture(fixture);
+    setTab("trends-detail");
+    setLoadingTrends(true);
+    setHomeTrends(null);
+    setAwayTrends(null);
+    Promise.all([
+      fetchJSON(`/api/team-trends?teamId=${fixture.home.id}`),
+      fetchJSON(`/api/team-trends?teamId=${fixture.away.id}`),
+    ])
+      .then(([h, a]) => { setHomeTrends(h); setAwayTrends(a); })
+      .finally(() => setLoadingTrends(false));
+  }
 
   return (
     <>
@@ -439,9 +513,29 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
         </main>
       )}
 
+      {tab === null && (
+        <TrendsPreview
+          trendLeague={trendLeague}
+          setTrendLeague={setTrendLeague}
+          fixtures={trendFixtures}
+          loading={loadingFixtures}
+          onOpen={openFixture}
+          onLocked={() => setTab("premium")}
+        />
+      )}
+
       {tab === "free" && <FreeForm freePick={freePick} onBack={() => setTab(null)} onRegistered={onFreeRegistered} />}
       {tab === "premium" && <PremiumForm zelleInfo={zelleInfo} onBack={() => setTab(null)} onRegistered={onPremiumRegistered} />}
       {tab === "status" && <StatusLookup premiumPick={premiumPick} onBack={() => setTab(null)} />}
+      {tab === "trends-detail" && selectedFixture && (
+        <TrendsDetail
+          fixture={selectedFixture}
+          homeTrends={homeTrends}
+          awayTrends={awayTrends}
+          loading={loadingTrends}
+          onBack={() => setTab(null)}
+        />
+      )}
 
       {tab === null && (
         <div className="under-links">
@@ -463,6 +557,109 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
         <button onClick={goAdmin}>ADMIN</button>
       </footer>
     </>
+  );
+}
+
+function TrendsPreview({ trendLeague, setTrendLeague, fixtures, loading, onOpen, onLocked }) {
+  return (
+    <section className="trends-section">
+      <div className="trends-section-head">
+        <h2 className="trends-title">Análisis de tendencias</h2>
+        <select className="league-select" value={trendLeague} onChange={(e) => setTrendLeague(Number(e.target.value))}>
+          {TREND_LEAGUES.map((l) => (
+            <option key={l.id} value={l.id}>{l.flag} {l.name}</option>
+          ))}
+        </select>
+      </div>
+      <p className="trends-subtitle">BTTS, over 2.5, tiros al arco, córners y tarjetas de los últimos partidos. Los primeros {FREE_TREND_PREVIEWS} son gratis.</p>
+
+      {loading && <p className="desc">Cargando partidos...</p>}
+      {!loading && fixtures.length === 0 && <p className="desc">No hay próximos partidos para esta liga ahora mismo.</p>}
+
+      <div className="trends-grid">
+        {fixtures.slice(0, 8).map((f, i) => {
+          const isLocked = i >= FREE_TREND_PREVIEWS;
+          return (
+            <div key={f.id} className={`trends-card ${isLocked ? "locked" : ""}`} onClick={() => (isLocked ? onLocked() : onOpen(f))}>
+              <div className="trends-card-teams">
+                <span><img src={f.home.logo} alt="" />{f.home.name}</span>
+                <span><img src={f.away.logo} alt="" />{f.away.name}</span>
+              </div>
+              <div className="trends-card-right">
+                {isLocked ? (
+                  <span className="trends-lock"><Lock size={12} /> Premium</span>
+                ) : (
+                  <span className="trends-cta">Ver análisis →</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function TrendsDetail({ fixture, homeTrends, awayTrends, loading, onBack }) {
+  return (
+    <div className="panel" style={{ maxWidth: 780 }}>
+      <button className="link-row" style={{ marginBottom: 20 }} onClick={onBack}><ArrowLeft size={14} /> Volver</button>
+
+      <div className="trends-matchup">
+        <div className="trends-matchup-team"><img src={fixture.home.logo} alt="" />{fixture.home.name}</div>
+        <span className="trends-vs">VS</span>
+        <div className="trends-matchup-team"><img src={fixture.away.logo} alt="" />{fixture.away.name}</div>
+      </div>
+
+      {loading && <p className="desc" style={{ textAlign: "center" }}>Calculando tendencias de los últimos partidos...</p>}
+
+      {!loading && homeTrends && awayTrends && (
+        <div className="trends-team-columns">
+          <TeamTrendCard team={fixture.home} trends={homeTrends} />
+          <TeamTrendCard team={fixture.away} trends={awayTrends} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TeamTrendCard({ team, trends }) {
+  if (!trends || trends.error) {
+    return (
+      <div className="box">
+        <p style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700 }}><img src={team.logo} alt="" style={{ width: 20 }} />{team.name}</p>
+        <p className="desc">No se pudieron cargar los datos de este equipo.</p>
+      </div>
+    );
+  }
+  const m = trends.matches || [];
+  return (
+    <div className="box">
+      <p style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, marginBottom: 12 }}><img src={team.logo} alt="" style={{ width: 20 }} />{team.name}</p>
+      <div className="trend-stat-grid">
+        <div className="trend-stat-box"><div className="trend-stat-num">{trends.bttsPct ?? "—"}%</div><div className="trend-stat-lbl">BTTS</div></div>
+        <div className="trend-stat-box"><div className="trend-stat-num">{trends.over25Pct ?? "—"}%</div><div className="trend-stat-lbl">Over 2.5</div></div>
+        <div className="trend-stat-box"><div className="trend-stat-num">{trends.avgShotsOnGoal ?? "—"}</div><div className="trend-stat-lbl">Tiros arco/PJ</div></div>
+        <div className="trend-stat-box"><div className="trend-stat-num">{trends.avgCorners ?? "—"}</div><div className="trend-stat-lbl">Córners/PJ</div></div>
+        <div className="trend-stat-box" style={{ gridColumn: "1 / -1" }}><div className="trend-stat-num">{trends.avgCards ?? "—"}</div><div className="trend-stat-lbl">Tarjetas/PJ (últimos {trends.sampleSize || 0})</div></div>
+      </div>
+      {m.length > 0 && (
+        <table className="ln-table">
+          <thead><tr><th>Rival</th><th>G</th><th>Tiros</th><th>Córn.</th><th>Tarj.</th></tr></thead>
+          <tbody>
+            {m.map((row, i) => (
+              <tr key={i}>
+                <td>{row.home ? "vs " : "@ "}{row.rival}</td>
+                <td>{row.goalsFor}-{row.goalsAgainst}</td>
+                <td>{row.shots ?? "—"}</td>
+                <td>{row.corners ?? "—"}</td>
+                <td>{row.cards ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
   );
 }
 

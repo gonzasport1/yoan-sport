@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Search, CreditCard, Upload, ArrowLeft, Lock, LogOut, Mail, CheckCircle2, Clock, TrendingUp, Target, ShieldCheck, PieChart } from "lucide-react";
+import { Search, CreditCard, Upload, ArrowLeft, Lock, LogOut, Mail, CheckCircle2, Clock, ShieldCheck } from "lucide-react";
+
+const GMAIL_RE = /^[^\s@]+@gmail\.com$/i;
+const BRAND = "Yoan Sport";
 
 const TREND_LEAGUES = [
   { id: 39, name: "Premier League", flag: "🏴" },
@@ -11,15 +14,20 @@ const TREND_LEAGUES = [
   { id: 71, name: "Brasileirão", flag: "🇧🇷" },
   { id: 262, name: "Liga MX", flag: "🇲🇽" },
 ];
-const FREE_TREND_PREVIEWS = 2; // cuántos partidos se ven gratis antes del candado
+
+const MARKET_TABS = [
+  { key: "matchGoals", label: "Goles" },
+  { key: "corners", label: "Córners" },
+  { key: "cards", label: "Tarjetas" },
+  { key: "fouls", label: "Faltas" },
+  { key: "totalShots", label: "Tiros" },
+  { key: "shotsOnTarget", label: "Tiros al arco" },
+];
 
 async function fetchJSON(url) {
   const r = await fetch(url);
   return r.json();
 }
-
-const GMAIL_RE = /^[^\s@]+@gmail\.com$/i;
-const BRAND = "Yoan Sport";
 
 // ---- Supabase connection (REST API via fetch, no SDK needed) ----
 const SUPABASE_URL = "https://xfhcmjfjgbqouehcuphx.supabase.co";
@@ -42,19 +50,12 @@ async function sb(path, options = {}) {
 }
 
 const getSettings = () => sb("settings?id=eq.1&select=*").then((r) => r?.[0]);
-
-const getFreeSubs = () => sb("free_subs?select=*&order=created_at.desc");
-const insertFreeSub = (email) =>
-  sb("free_subs", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ email }) });
-
-const getPremiumSubs = () => sb("premium_subs?select=*&order=created_at.desc");
 const insertPremiumSub = (entry) =>
   sb("premium_subs", { method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify(entry) });
 const searchPremiumByEmail = (email) => sb(`premium_subs?email=eq.${encodeURIComponent(email)}&select=*&order=created_at.desc`);
+const getFreeSubs = () => sb("free_subs?select=*&order=created_at.desc"); // se mantiene solo para el panel admin (histórico)
+const getPremiumSubs = () => sb("premium_subs?select=*&order=created_at.desc");
 
-// Escrituras de administrador: pasan por el servidor, que valida la contraseña
-// contra una variable de entorno y usa la clave secreta de Supabase — nunca
-// se hacen directo desde el navegador con la clave pública.
 async function adminWrite(password, action, payload) {
   const res = await fetch("/api/admin-write", {
     method: "POST",
@@ -75,36 +76,10 @@ async function adminLogin(password) {
 
 const GLOBAL_CSS = `
   :root{
-    --bg: #06090b;
-    --bg-2: #0b1214;
-    --teal-bright: #12d6c4;
-    --gold: #e8b649;
-    --gold-dim: #a9843a;
-    --text: #eef4f2;
-    --muted: #7f9490;
-    --line: rgba(18,214,196,0.14);
-    --card: rgba(255,255,255,0.025);
+    --bg: #06090b; --bg-2: #0b1214; --teal-bright: #12d6c4; --gold: #e8b649; --gold-dim: #a9843a;
+    --text: #eef4f2; --muted: #7f9490; --line: rgba(18,214,196,0.14); --card: rgba(255,255,255,0.025);
   }
-  .ln-root{
-    background:
-      radial-gradient(ellipse 900px 500px at 20% -10%, rgba(18,214,196,0.10), transparent 60%),
-      radial-gradient(ellipse 700px 500px at 100% 10%, rgba(232,182,73,0.07), transparent 55%),
-      linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
-    color:var(--text);
-    font-family:'Inter', sans-serif;
-    min-height:100vh;
-    position:relative;
-  }
-  .ln-root::before{
-    content:"";
-    position:fixed; inset:0;
-    background-image:
-      linear-gradient(rgba(18,214,196,0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(18,214,196,0.035) 1px, transparent 1px);
-    background-size: 42px 42px;
-    mask-image: radial-gradient(ellipse 100% 60% at 50% 0%, black 20%, transparent 75%);
-    pointer-events:none;
-  }
+  .ln-root{ background: radial-gradient(ellipse 900px 500px at 20% -10%, rgba(18,214,196,0.10), transparent 60%), radial-gradient(ellipse 700px 500px at 100% 10%, rgba(232,182,73,0.07), transparent 55%), linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%); color:var(--text); font-family:'Inter', sans-serif; min-height:100vh; position:relative; }
   .ticker{ position:relative; z-index:2; border-bottom:1px solid var(--line); background:rgba(0,0,0,0.35); overflow:hidden; white-space:nowrap; padding:9px 0; }
   .ticker-track{ display:inline-flex; animation: scroll-left 32s linear infinite; }
   .ticker span{ font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--muted); padding:0 28px; letter-spacing:0.5px; display:inline-flex; align-items:center; gap:8px; }
@@ -117,50 +92,21 @@ const GLOBAL_CSS = `
   .nav-status{ font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--muted); display:flex; align-items:center; gap:7px; }
   .dot-live{ width:6px;height:6px;border-radius:50%; background:#5be89a; box-shadow:0 0 8px #5be89a; animation:pulse 1.8s ease-in-out infinite; }
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.35;}}
-  header.hero{ position:relative; z-index:2; max-width:1180px; margin:0 auto; padding:70px 5vw 40px; text-align:center; overflow:hidden; }
-  header.hero::before{
-    content:"";
-    position:absolute; inset:-20% -10%;
-    background:
-      radial-gradient(ellipse 480px 220px at 12% 8%, rgba(18,214,196,0.10), transparent 60%),
-      linear-gradient(115deg, transparent 58%, rgba(232,182,73,0.10) 59%, transparent 60%),
-      linear-gradient(115deg, transparent 63%, rgba(18,214,196,0.14) 64%, transparent 65%),
-      linear-gradient(115deg, transparent 67%, rgba(18,214,196,0.07) 67.6%, transparent 68.2%);
-    pointer-events:none; z-index:-1;
-  }
-  .hero-decor{ position:absolute; top:8px; display:none; width:150px; }
-  @media (min-width: 980px){ .hero-decor{ display:block; } }
-  .hero-decor-left{ left:0; text-align:left; }
-  .hero-decor-right{ right:0; text-align:right; }
-  .hero-decor-label{ font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:2px; color:var(--muted); margin-bottom:12px; text-transform:uppercase; }
-  .hero-metric-row{ display:flex; align-items:center; gap:8px; margin-bottom:7px; }
-  .hero-metric-label{ font-size:10px; color:var(--muted); width:34px; font-family:'JetBrains Mono', monospace; }
-  .hero-metric-bar{ width:76px; height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden; }
-  .hero-metric-fill{ height:100%; background:linear-gradient(90deg, var(--teal-bright), rgba(18,214,196,0.3)); }
-  .hero-chart{ width:120px; height:50px; }
-  .hero-badge{ display:inline-block; margin-top:6px; font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--teal-bright); background:rgba(18,214,196,0.08); border:1px solid rgba(18,214,196,0.25); padding:3px 8px; border-radius:6px; }
-  .hero-features{ display:flex; justify-content:center; gap:34px; flex-wrap:wrap; margin-top:38px; padding-top:26px; border-top:1px solid rgba(255,255,255,0.07); }
-  .hero-feature{ display:flex; align-items:center; gap:9px; }
-  .hero-feature svg{ color:var(--teal-bright); flex-shrink:0; }
-  .hero-feature strong{ display:block; font-size:11px; letter-spacing:0.8px; color:var(--text); }
-  .hero-feature span{ display:block; font-size:10px; color:var(--muted); margin-top:1px; }
-  .brand-word-1{ background:linear-gradient(180deg, #ffffff 10%, #b9c9c6 55%, #6f8a85 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .brand-word-2{ background:linear-gradient(180deg, #7fe0d4 0%, var(--teal-bright) 55%, #0ea89b 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  header.hero{ position:relative; z-index:2; max-width:1180px; margin:0 auto; padding:70px 5vw 40px; text-align:center; }
   .eyebrow{ font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:4px; color:var(--gold); text-transform:uppercase; margin-bottom:18px; display:inline-flex; align-items:center; gap:10px; }
   .eyebrow::before, .eyebrow::after{ content:""; width:22px; height:1px; background:var(--gold-dim); }
-  h1.wordmark{ font-family:'Bebas Neue', sans-serif; font-size: clamp(40px, 9vw, 76px); line-height:1; letter-spacing:3px; text-transform:uppercase; background:linear-gradient(180deg, #ffffff 10%, #b9c9c6 55%, #6f8a85 100%); -webkit-background-clip:text; background-clip:text; color:transparent; filter:drop-shadow(0 0 40px rgba(18,214,196,0.18)); margin-bottom:6px; }
+  h1.wordmark{ font-family:'Bebas Neue', sans-serif; font-size: clamp(40px, 9vw, 76px); line-height:1; letter-spacing:3px; text-transform:uppercase; margin-bottom:6px; }
+  .brand-word-1{ background:linear-gradient(180deg, #ffffff 10%, #b9c9c6 55%, #6f8a85 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .brand-word-2{ background:linear-gradient(180deg, #7fe0d4 0%, var(--teal-bright) 55%, #0ea89b 100%); -webkit-background-clip:text; background-clip:text; color:transparent; }
   .subline{ font-family:'JetBrains Mono', monospace; font-size:13px; letter-spacing:3.5px; color:var(--teal-bright); text-transform:uppercase; }
-  .hero-desc{ max-width:480px; margin:22px auto 0; color:var(--muted); font-size:14.5px; line-height:1.65; }
+  .hero-desc{ max-width:520px; margin:22px auto 0; color:var(--muted); font-size:14.5px; line-height:1.65; }
   .scoreboard{ position:relative; z-index:2; max-width:920px; margin:38px auto 10px; padding:0 5vw; display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
   .scoreboard .cell{ background:rgba(6,9,11,0.85); padding:16px 10px; text-align:center; }
   .scoreboard .cell .num{ font-family:'Bebas Neue', sans-serif; font-size:26px; color:var(--text); letter-spacing:1px; }
   .scoreboard .cell .lbl{ font-family:'JetBrains Mono', monospace; font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; margin-top:3px; }
-  main.ln-main{ position:relative; z-index:2; max-width:960px; margin:56px auto 0; padding:0 5vw 90px; display:grid; grid-template-columns: 1fr 1.15fr; gap:22px; }
-  @media (max-width: 760px){ main.ln-main{grid-template-columns:1fr;} }
   .card{ background:var(--card); border:1px solid rgba(255,255,255,0.07); border-radius:18px; padding:30px 28px; position:relative; overflow:hidden; backdrop-filter:blur(16px); display:flex; flex-direction:column; }
-  .card .icon{ width:38px; height:38px; display:flex; align-items:center; justify-content:center; margin-bottom:18px; }
   .card h2{ font-family:'Bebas Neue', sans-serif; font-size:26px; letter-spacing:1.5px; margin-bottom:10px; }
-  .card p.desc{ color:var(--muted); font-size:13.5px; line-height:1.6; margin-bottom:24px; flex-grow:1; }
+  .card p.desc{ color:var(--muted); font-size:13.5px; line-height:1.6; margin-bottom:24px; }
   .ln-input{ width:100%; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); border-radius:9px; padding:12px 14px; color:var(--text); font-family:'Inter', sans-serif; font-size:13.5px; margin-bottom:12px; outline:none; transition:border-color .2s; }
   .ln-input:focus{border-color:var(--teal-bright);}
   .ln-input::placeholder{color:var(--muted);}
@@ -169,15 +115,6 @@ const GLOBAL_CSS = `
   .btn:disabled{opacity:0.5; cursor:not-allowed; transform:none;}
   .btn.ghost{ background:transparent; border:1px solid rgba(255,255,255,0.18); color:var(--text); }
   .btn.ghost:hover{ border-color:var(--teal-bright); color:var(--teal-bright); }
-  .card.premium{ background:linear-gradient(160deg, rgba(18,214,196,0.07), rgba(232,182,73,0.04)); border:1px solid rgba(18,214,196,0.35); box-shadow: 0 0 0 1px rgba(18,214,196,0.06) inset, 0 20px 60px -20px rgba(18,214,196,0.25); }
-  .card.premium::before{ content:""; position:absolute; top:-40%; right:-30%; width:280px; height:280px; background:radial-gradient(circle, rgba(232,182,73,0.18), transparent 70%); pointer-events:none; }
-  .premium-badge{ position:absolute; top:22px; right:22px; font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:2px; color:var(--bg); background:linear-gradient(120deg, var(--gold), #ffd97a); padding:5px 10px; border-radius:20px; font-weight:700; }
-  .card.premium h2{ background:linear-gradient(90deg, #fff, var(--teal-bright)); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .price-row{ display:flex; align-items:baseline; gap:6px; margin-bottom:20px; }
-  .price-row .price{ font-family:'Bebas Neue', sans-serif; font-size:38px; color:var(--gold); letter-spacing:1px; }
-  .price-row .per{ font-size:12px; color:var(--muted); font-family:'JetBrains Mono', monospace; }
-  .feature-list{ list-style:none; margin-bottom:24px; display:flex; flex-direction:column; gap:9px; padding:0; }
-  .feature-list li{ font-size:13px; color:var(--text); display:flex; align-items:center; gap:9px; }
   .btn.solid{ background:linear-gradient(120deg, var(--teal-bright), #0ea89b); color:#04211d; box-shadow:0 8px 24px -8px rgba(18,214,196,0.5); }
   .btn.solid:hover{ box-shadow:0 10px 30px -8px rgba(18,214,196,0.7); }
   .pay-note{ margin-top:12px; font-size:11px; color:var(--muted); text-align:center; font-family:'JetBrains Mono', monospace; }
@@ -194,18 +131,15 @@ const GLOBAL_CSS = `
   .pill-approve{ font-size:11px; background:rgba(91,232,154,0.12); color:#5be89a; border:1px solid rgba(91,232,154,0.3); padding:6px 12px; border-radius:20px; cursor:pointer; }
   .pill-reject{ font-size:11px; background:rgba(255,107,107,0.12); color:#ff6b6b; border:1px solid rgba(255,107,107,0.3); padding:6px 12px; border-radius:20px; cursor:pointer; }
   .banner-error{ background:rgba(255,107,107,0.1); border:1px solid rgba(255,107,107,0.3); color:#ff9b9b; font-size:12px; padding:10px 14px; border-radius:10px; margin-bottom:16px; }
-  .corner-summary{ position:fixed; bottom:20px; right:20px; z-index:50; width:270px; background:rgba(8,12,14,0.92); backdrop-filter:blur(14px); border:1px solid rgba(18,214,196,0.25); border-radius:14px; padding:14px 16px; box-shadow:0 12px 40px -10px rgba(0,0,0,0.6); }
-  .corner-summary-head{ font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:1.5px; color:var(--teal-bright); text-transform:uppercase; display:flex; align-items:center; gap:6px; margin-bottom:10px; }
-  .corner-summary-row{ display:flex; align-items:flex-start; gap:8px; margin-bottom:8px; }
-  .corner-summary-row:last-child{ margin-bottom:0; }
-  .corner-summary-tag{ font-size:9px; font-weight:700; letter-spacing:1px; padding:3px 6px; border-radius:5px; flex-shrink:0; margin-top:1px; }
-  .corner-summary-tag.free{ background:rgba(255,255,255,0.08); color:var(--muted); }
-  .corner-summary-tag.premium{ background:rgba(232,182,73,0.15); color:var(--gold); }
-  .corner-summary-text{ font-size:12px; color:var(--text); line-height:1.4; }
-  .corner-summary-text.locked{ color:var(--muted); font-style:italic; }
-  @media (max-width: 640px){ .corner-summary{ left:16px; right:16px; width:auto; bottom:16px; } }
   .legal-disclaimer{ position:relative; z-index:2; max-width:680px; margin:0 auto; padding:0 5vw 20px; text-align:center; font-size:11px; color:var(--muted); line-height:1.6; }
-  .trends-section{ position:relative; z-index:2; max-width:960px; margin:44px auto 0; padding:0 5vw; }
+
+  .access-banner{ position:relative; z-index:2; max-width:960px; margin:30px auto 0; padding:0 5vw; }
+  .access-box{ background:linear-gradient(160deg, rgba(18,214,196,0.08), rgba(232,182,73,0.04)); border:1px solid rgba(18,214,196,0.3); border-radius:16px; padding:20px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .access-box.unlocked{ border-color:rgba(91,232,154,0.4); background:rgba(91,232,154,0.06); }
+  .access-box p{ font-size:13px; color:var(--text); }
+  .access-box .btn{ width:auto; padding:10px 20px; }
+
+  .trends-section{ position:relative; z-index:2; max-width:960px; margin:30px auto 0; padding:0 5vw 60px; }
   .trends-section-head{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:6px; }
   .trends-title{ font-family:'Bebas Neue', sans-serif; font-size:24px; letter-spacing:1px; color:var(--text); }
   .trends-subtitle{ color:var(--muted); font-size:12.5px; margin-bottom:16px; }
@@ -214,26 +148,33 @@ const GLOBAL_CSS = `
   @media (max-width:640px){ .trends-grid{ grid-template-columns:1fr; } }
   .trends-card{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid rgba(255,255,255,0.08); border-radius:12px; background:var(--card); cursor:pointer; transition:border-color .15s; }
   .trends-card:hover{ border-color:var(--teal-bright); }
-  .trends-card.locked{ opacity:0.75; }
-  .trends-card.locked:hover{ border-color:var(--gold); }
   .trends-card-teams{ display:flex; flex-direction:column; gap:5px; font-size:12.5px; }
   .trends-card-teams span{ display:flex; align-items:center; gap:6px; }
   .trends-card-teams img{ width:16px; height:16px; object-fit:contain; }
-  .trends-cta{ font-size:11px; color:var(--teal-bright); font-weight:600; white-space:nowrap; }
   .trends-lock{ font-size:11px; color:var(--gold); font-weight:600; display:flex; align-items:center; gap:4px; white-space:nowrap; }
-  .trends-matchup{ display:flex; align-items:center; justify-content:center; gap:18px; margin-bottom:26px; }
+  .trends-cta{ font-size:11px; color:var(--teal-bright); font-weight:600; white-space:nowrap; }
+  .trends-matchup{ display:flex; align-items:center; justify-content:center; gap:18px; margin-bottom:22px; }
   .trends-matchup-team{ display:flex; flex-direction:column; align-items:center; gap:8px; font-family:'Bebas Neue', sans-serif; font-size:16px; letter-spacing:0.5px; }
   .trends-matchup-team img{ width:36px; height:36px; object-fit:contain; }
   .trends-vs{ color:var(--muted); font-size:11px; font-family:'JetBrains Mono', monospace; }
   .trends-team-columns{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-  @media (max-width:640px){ .trends-team-columns{ grid-template-columns:1fr; } }
-  .trend-stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
-  .trend-stat-box{ background:rgba(0,0,0,0.25); border-radius:8px; padding:10px; text-align:center; }
-  .trend-stat-num{ font-family:'Bebas Neue', sans-serif; font-size:22px; color:var(--teal-bright); }
-  .trend-stat-lbl{ font-size:9.5px; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-top:2px; }
-  .ln-table{ width:100%; border-collapse:collapse; font-size:11px; margin-top:6px; }
-  .ln-table th{ text-align:left; color:var(--muted); font-weight:500; padding:5px 4px; border-bottom:1px solid rgba(255,255,255,0.08); font-size:10px; text-transform:uppercase; }
-  .ln-table td{ padding:6px 4px; border-bottom:1px solid rgba(255,255,255,0.04); }
+  @media (max-width:700px){ .trends-team-columns{ grid-template-columns:1fr; } }
+
+  .market-tabs{ display:flex; gap:4px; flex-wrap:wrap; margin-bottom:14px; background:rgba(0,0,0,0.2); padding:4px; border-radius:10px; }
+  .market-tab{ font-size:10.5px; padding:7px 10px; border-radius:7px; background:none; border:none; color:var(--muted); cursor:pointer; white-space:nowrap; }
+  .market-tab.active{ background:var(--teal-bright); color:#04211d; font-weight:700; }
+  .metric-summary{ display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .metric-summary .line-badge{ background:rgba(232,182,73,0.12); border:1px solid rgba(232,182,73,0.3); color:var(--gold); font-size:11px; padding:4px 9px; border-radius:6px; font-family:'JetBrains Mono', monospace; }
+  .metric-summary .hitrate{ text-align:right; }
+  .metric-summary .hitrate .pct{ font-family:'Bebas Neue', sans-serif; font-size:22px; color:var(--teal-bright); }
+  .metric-summary .hitrate .lbl{ font-size:9.5px; color:var(--muted); text-transform:uppercase; }
+  .bar-chart{ display:flex; align-items:flex-end; gap:4px; height:110px; padding:10px 0; border-bottom:1px solid rgba(255,255,255,0.1); position:relative; }
+  .bar-chart .ref-line{ position:absolute; left:0; right:0; border-top:1px dashed var(--gold); font-size:9px; color:var(--gold); text-align:right; padding-right:2px; }
+  .bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; min-width:0; }
+  .bar-rect{ width:70%; border-radius:3px 3px 0 0; }
+  .bar-rect.over{ background:#5be89a; } .bar-rect.under{ background:#ff6b6b; }
+  .bar-val{ font-size:9px; color:var(--text); }
+  .bar-lbl{ font-size:8px; color:var(--muted); writing-mode:vertical-rl; text-orientation:mixed; max-height:34px; overflow:hidden; }
 `;
 
 function Check() {
@@ -243,40 +184,22 @@ function Check() {
     </svg>
   );
 }
-function StarIcon() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-    </svg>
-  );
-}
-function ShieldIcon() {
-  return (
-    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M12 2 3 6v6c0 5.25 3.75 9.75 9 11 5.25-1.25 9-5.75 9-11V6l-9-4z" />
-    </svg>
-  );
-}
 
 export default function App() {
-  const [freePick, setFreePick] = useState("Cargando...");
-  const [premiumPick, setPremiumPick] = useState("Cargando...");
   const [zelleInfo, setZelleInfo] = useState({ handle: "", name: "", price: "" });
   const [winRate, setWinRate] = useState("62%");
   const [baseMembers, setBaseMembers] = useState(20);
   const [freeSubs, setFreeSubs] = useState([]);
   const [premiumSubs, setPremiumSubs] = useState([]);
   const [view, setView] = useState("public");
-  const [adminPassword, setAdminPassword] = useState("");
   const [dbError, setDbError] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
 
   async function loadAll() {
     try {
       const [settings, free, premium] = await Promise.all([getSettings(), getFreeSubs(), getPremiumSubs()]);
       if (settings) {
-        setFreePick(settings.free_pick);
-        setPremiumPick(settings.premium_pick);
         setZelleInfo({ name: settings.zelle_name, handle: settings.zelle_handle, price: settings.zelle_price });
         if (settings.win_rate) setWinRate(settings.win_rate);
         if (settings.base_members != null) setBaseMembers(settings.base_members);
@@ -285,7 +208,7 @@ export default function App() {
       setPremiumSubs(premium || []);
       setDbError("");
     } catch (err) {
-      setDbError(`No se pudo conectar con la base de datos: ${err.message || err}`);
+      setDbError("No se pudo conectar con la base de datos.");
     } finally {
       setLoaded(true);
     }
@@ -303,30 +226,22 @@ export default function App() {
 
       {view === "public" && (
         <PublicSite
-          freePick={freePick}
-          premiumPick={premiumPick}
-          zelleInfo={zelleInfo}
           dbError={dbError}
+          zelleInfo={zelleInfo}
           winRate={winRate}
-          membersCount={baseMembers + freeSubs.length + premiumSubs.filter((p) => p.status === "approved").length}
-          onFreeRegistered={(email) => setFreeSubs((s) => [{ email }, ...s])}
+          membersCount={baseMembers + premiumSubs.filter((p) => p.status === "approved").length}
           onPremiumRegistered={(entry) => setPremiumSubs((s) => [{ ...entry, status: "pending" }, ...s])}
           goAdmin={() => setView("admin-login")}
         />
       )}
       {view === "admin-login" && (
-        <AdminLogin
-          onBack={() => setView("public")}
-          onSuccess={(pw) => { setAdminPassword(pw); setView("admin"); }}
-        />
+        <AdminLogin onBack={() => setView("public")} onSuccess={(pw) => { setAdminPassword(pw); setView("admin"); }} />
       )}
       {view === "admin" && (
         <AdminPanel
           loaded={loaded}
           dbError={dbError}
           adminPassword={adminPassword}
-          freePick={freePick} setFreePick={setFreePick}
-          premiumPick={premiumPick} setPremiumPick={setPremiumPick}
           zelleInfo={zelleInfo} setZelleInfo={setZelleInfo}
           winRate={winRate} setWinRate={setWinRate}
           baseMembers={baseMembers} setBaseMembers={setBaseMembers}
@@ -342,8 +257,6 @@ export default function App() {
 
 function Ticker() {
   const [items, setItems] = useState([]);
-  const [triedLoad, setTriedLoad] = useState(false);
-
   useEffect(() => {
     let active = true;
     async function load() {
@@ -351,51 +264,31 @@ function Ticker() {
         const res = await fetch("/api/live-scores");
         const data = await res.json();
         if (active) setItems(Array.isArray(data.items) ? data.items : []);
-      } catch (err) {
-        // se ignora: si falla, se muestra el ticker de ejemplo más abajo
-      } finally {
-        if (active) setTriedLoad(true);
-      }
+      } catch (err) {}
     }
     load();
-    const id = setInterval(load, 60000); // se actualiza cada 60s
+    const id = setInterval(load, 60000);
     return () => { active = false; clearInterval(id); };
   }, []);
 
-  if (items.length > 0) {
-    const doubled = [...items, ...items];
+  if (items.length === 0) {
     return (
-      <div className="ticker">
-        <div className="ticker-track">
-          {doubled.map((it, i) => (
-            <span key={i}>
-              <b>{it.sport}</b>
-              {it.homeLogo && <img src={it.homeLogo} alt="" className="ticker-logo" />}
-              {it.homeName} {it.homeScore ?? "-"}—{it.awayScore ?? "-"} {it.awayName}
-              {it.awayLogo && <img src={it.awayLogo} alt="" className="ticker-logo" />}
-              <span className="up">{it.status}</span>
-            </span>
-          ))}
-        </div>
-      </div>
+      <div className="ticker"><div className="ticker-track">
+        <span><b>YOAN SPORT</b> Análisis en vivo de fútbol — BTTS, córners, tarjetas, tiros y más</span>
+      </div></div>
     );
   }
-
-  // Fallback (mientras carga, o si no hay partidos en vivo ahora mismo)
-  const demo = [
-    { tag: "NRFI", label: "LAD @ SF", val: "62%", cls: "up" },
-    { tag: "F5", label: "NYY -1.5", val: "58%", cls: "up" },
-    { tag: "TT", label: "ATL o4.5", val: "44%", cls: "down" },
-    { tag: "NRFI", label: "HOU @ SEA", val: "67%", cls: "up" },
-    { tag: "MUNDIAL", label: "ESP vs FRA — xGA 1.2", val: "71%", cls: "up" },
-  ];
-  const doubledDemo = [...demo, ...demo];
+  const doubled = [...items, ...items];
   return (
     <div className="ticker">
       <div className="ticker-track">
-        {doubledDemo.map((it, i) => (
+        {doubled.map((it, i) => (
           <span key={i}>
-            <b>{it.tag}</b> {it.label} <span className={it.cls}>{triedLoad ? "sin partidos en vivo" : it.val}</span>
+            <b>{it.sport}</b>
+            {it.homeLogo && <img src={it.homeLogo} alt="" className="ticker-logo" />}
+            {it.homeName} {it.homeScore ?? "-"}—{it.awayScore ?? "-"} {it.awayName}
+            {it.awayLogo && <img src={it.awayLogo} alt="" className="ticker-logo" />}
+            <span className="up">{it.status}</span>
           </span>
         ))}
       </div>
@@ -403,7 +296,8 @@ function Ticker() {
   );
 }
 
-function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, membersCount, onFreeRegistered, onPremiumRegistered, goAdmin }) {
+// ==================== PUBLIC SITE ====================
+function PublicSite({ dbError, zelleInfo, winRate, membersCount, onPremiumRegistered, goAdmin }) {
   const [tab, setTab] = useState(null);
   const [trendLeague, setTrendLeague] = useState(TREND_LEAGUES[0].id);
   const [trendFixtures, setTrendFixtures] = useState([]);
@@ -413,6 +307,13 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
   const [awayTrends, setAwayTrends] = useState(null);
   const [loadingTrends, setLoadingTrends] = useState(false);
 
+  const [unlockedEmail, setUnlockedEmail] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem("yoansport_access") || "null");
+      return saved?.approved ? saved.email : null;
+    } catch { return null; }
+  });
+
   useEffect(() => {
     setLoadingFixtures(true);
     fetchJSON(`/api/fixtures?league=${trendLeague}`)
@@ -421,6 +322,7 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
   }, [trendLeague]);
 
   function openFixture(fixture) {
+    if (!unlockedEmail) { setTab("premium"); return; }
     setSelectedFixture(fixture);
     setTab("trends-detail");
     setLoadingTrends(true);
@@ -434,6 +336,12 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
       .finally(() => setLoadingTrends(false));
   }
 
+  function handleUnlock(email) {
+    setUnlockedEmail(email);
+    localStorage.setItem("yoansport_access", JSON.stringify({ email, approved: true }));
+    setTab(null);
+  }
+
   return (
     <>
       <Ticker />
@@ -443,74 +351,41 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
       </nav>
 
       <header className="hero">
-        <div className="hero-decor hero-decor-left">
-          <div className="hero-decor-label">DATA ANALYTICS</div>
-          {[["xG", 78], ["xGA", 55], ["wRC+", 66], ["ERA", 32]].map(([label, pct]) => (
-            <div className="hero-metric-row" key={label}>
-              <span className="hero-metric-label">{label}</span>
-              <div className="hero-metric-bar"><div className="hero-metric-fill" style={{ width: `${pct}%` }} /></div>
-            </div>
-          ))}
-        </div>
-
-        <div className="hero-decor hero-decor-right">
-          <svg viewBox="0 0 120 50" className="hero-chart">
-            <polyline points="0,40 15,32 30,36 45,20 60,26 75,10 90,16 105,6 120,12" fill="none" stroke="var(--teal-bright)" strokeWidth="2" />
-          </svg>
-          <span className="hero-badge">+1.82</span>
-        </div>
-
         <div className="eyebrow">Análisis Sabermétrico</div>
         <h1 className="wordmark"><span className="brand-word-1">Yoan</span> <span className="brand-word-2">Sport</span></h1>
-        <div className="subline">Picks &amp; Análisis Deportivo</div>
+        <div className="subline">Análisis de Tendencias de Fútbol</div>
         <p className="hero-desc">
-          Dashboards diarios de MLB y fútbol construidos sobre datos verificados — ERA, wRC+, xG, xGA — no
-          corazonadas. Tú decides la línea, nosotros hacemos los números.
+          Estadísticas reales de los últimos partidos de cada equipo — goles, córners, tarjetas, faltas y tiros —
+          de las principales ligas de Europa, Brasil y México. Datos verificados, no corazonadas.
         </p>
         {dbError && <p className="banner-error" style={{ maxWidth: 420, margin: "16px auto 0" }}>{dbError}</p>}
-
-        <div className="hero-features">
-          <div className="hero-feature"><TrendingUp size={18} /><div><strong>DATOS REALES</strong><span>Decisiones inteligentes</span></div></div>
-          <div className="hero-feature"><Target size={18} /><div><strong>ANÁLISIS PROFESIONAL</strong><span>Ventaja a largo plazo</span></div></div>
-          <div className="hero-feature"><ShieldCheck size={18} /><div><strong>DISCIPLINA</strong><span>Gestión de riesgo</span></div></div>
-          <div className="hero-feature"><PieChart size={18} /><div><strong>RESULTADOS</strong><span>Consistentes</span></div></div>
-        </div>
       </header>
 
       {tab === null && (
         <div className="scoreboard">
           <div className="cell"><div className="num">{winRate}</div><div className="lbl">Acierto 7D</div></div>
           <div className="cell"><div className="num">{membersCount}</div><div className="lbl">Miembros</div></div>
-          <div className="cell"><div className="num">3</div><div className="lbl">Mercados</div></div>
+          <div className="cell"><div className="num">8</div><div className="lbl">Ligas</div></div>
           <div className="cell"><div className="num">24h</div><div className="lbl">Verificación</div></div>
         </div>
       )}
 
       {tab === null && (
-        <main className="ln-main">
-          <div className="card free">
-            <div className="icon"><StarIcon /></div>
-            <h2>Gratuito</h2>
-            <p className="desc">El pick del día, directo a tu correo. Sin tarjeta, sin compromiso — así probás la calidad del análisis antes de dar el salto.</p>
-            <button className="btn ghost" onClick={() => setTab("free")}>Recibir pick gratuito</button>
+        <div className="access-banner">
+          <div className={`access-box ${unlockedEmail ? "unlocked" : ""}`}>
+            {unlockedEmail ? (
+              <>
+                <p><CheckCircle2 size={14} style={{ verticalAlign: "middle", marginRight: 6, color: "#5be89a" }} />Acceso desbloqueado para <b>{unlockedEmail}</b></p>
+                <button className="btn ghost" onClick={() => { localStorage.removeItem("yoansport_access"); setUnlockedEmail(null); }}>Cerrar acceso</button>
+              </>
+            ) : (
+              <>
+                <p><ShieldCheck size={14} style={{ verticalAlign: "middle", marginRight: 6, color: "var(--gold)" }} />Registrate y pagá para desbloquear el análisis completo de todas las ligas.</p>
+                <button className="btn solid" onClick={() => setTab("premium")}>Quiero acceso premium — {zelleInfo.price}</button>
+              </>
+            )}
           </div>
-
-          <div className="card premium">
-            <div className="premium-badge">PREMIUM</div>
-            <div className="icon"><ShieldIcon /></div>
-            <h2>Acceso Premium</h2>
-            <div className="price-row"><span className="price">{zelleInfo.price}</span><span className="per">/ mes · pago por Zelle</span></div>
-            <ul className="feature-list">
-              <li><Check /> Tiers PREMIUM / SÓLIDO / RIESGO con score de confianza</li>
-              <li><Check /> NRFI, Team Total y F5 con razones métricas</li>
-              <li><Check /> Dashboards fútbol: xGA, H2H, probabilidad implícita</li>
-              <li><Check /> Acceso tras verificación de pago</li>
-            </ul>
-            <button className="btn solid" onClick={() => setTab("premium")}>Quiero premium →</button>
-            <div className="pay-note">Verificación manual en menos de 24h</div>
-            <div className="pay-note" style={{ marginTop: 4 }}>+18 · Apostar conlleva riesgo, no hay resultados garantizados</div>
-          </div>
-        </main>
+        </div>
       )}
 
       {tab === null && (
@@ -519,37 +394,31 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
           setTrendLeague={setTrendLeague}
           fixtures={trendFixtures}
           loading={loadingFixtures}
+          unlocked={!!unlockedEmail}
           onOpen={openFixture}
-          onLocked={() => setTab("premium")}
         />
       )}
 
-      {tab === "free" && <FreeForm freePick={freePick} onBack={() => setTab(null)} onRegistered={onFreeRegistered} />}
-      {tab === "premium" && <PremiumForm zelleInfo={zelleInfo} onBack={() => setTab(null)} onRegistered={onPremiumRegistered} />}
-      {tab === "status" && <StatusLookup premiumPick={premiumPick} onBack={() => setTab(null)} />}
+      {tab === "premium" && (
+        <PremiumForm zelleInfo={zelleInfo} onBack={() => setTab(null)} onRegistered={onPremiumRegistered} />
+      )}
+      {tab === "status" && <StatusLookup onBack={() => setTab(null)} onUnlock={handleUnlock} />}
       {tab === "trends-detail" && selectedFixture && (
-        <TrendsDetail
-          fixture={selectedFixture}
-          homeTrends={homeTrends}
-          awayTrends={awayTrends}
-          loading={loadingTrends}
-          onBack={() => setTab(null)}
-        />
+        <TrendsDetail fixture={selectedFixture} homeTrends={homeTrends} awayTrends={awayTrends} loading={loadingTrends} onBack={() => setTab(null)} />
       )}
 
       {tab === null && (
         <div className="under-links">
           <button className="link-row" onClick={() => setTab("status")}>
-            <Search size={15} /> Ya me registré, quiero ver mi estado
+            <Search size={15} /> Ya pagué, quiero activar mi acceso
           </button>
         </div>
       )}
 
-      {tab === null && <CornerSummary freePick={freePick} premiumPick={premiumPick} />}
-
       <p className="legal-disclaimer">
         Contenido con fines informativos y de entretenimiento. No garantiza resultados ni ganancias. Apostar
-        conlleva riesgo — hacelo de forma responsable. Servicio dirigido a mayores de 18 años.
+        conlleva riesgo — hacelo de forma responsable. Servicio dirigido a mayores de 18 años. Las líneas mostradas
+        son promedios estadísticos propios, no cuotas de casas de apuestas.
       </p>
 
       <footer className="site-footer">
@@ -560,41 +429,36 @@ function PublicSite({ freePick, premiumPick, zelleInfo, dbError, winRate, member
   );
 }
 
-function TrendsPreview({ trendLeague, setTrendLeague, fixtures, loading, onOpen, onLocked }) {
+function TrendsPreview({ trendLeague, setTrendLeague, fixtures, loading, unlocked, onOpen }) {
   return (
     <section className="trends-section">
       <div className="trends-section-head">
-        <h2 className="trends-title">Análisis de tendencias</h2>
+        <h2 className="trends-title">Próximos partidos</h2>
         <select className="league-select" value={trendLeague} onChange={(e) => setTrendLeague(Number(e.target.value))}>
-          {TREND_LEAGUES.map((l) => (
-            <option key={l.id} value={l.id}>{l.flag} {l.name}</option>
-          ))}
+          {TREND_LEAGUES.map((l) => (<option key={l.id} value={l.id}>{l.flag} {l.name}</option>))}
         </select>
       </div>
-      <p className="trends-subtitle">BTTS, over 2.5, tiros al arco, córners y tarjetas de los últimos partidos. Los primeros {FREE_TREND_PREVIEWS} son gratis.</p>
+      <p className="trends-subtitle">
+        {unlocked ? "Tocá cualquier partido para ver el análisis completo." : "Con acceso premium desbloqueás el análisis de todos estos partidos."}
+      </p>
 
       {loading && <p className="desc">Cargando partidos...</p>}
       {!loading && fixtures.length === 0 && <p className="desc">No hay próximos partidos para esta liga ahora mismo.</p>}
 
       <div className="trends-grid">
-        {fixtures.slice(0, 8).map((f, i) => {
-          const isLocked = i >= FREE_TREND_PREVIEWS;
-          return (
-            <div key={f.id} className={`trends-card ${isLocked ? "locked" : ""}`} onClick={() => (isLocked ? onLocked() : onOpen(f))}>
-              <div className="trends-card-teams">
-                <span><img src={f.home.logo} alt="" />{f.home.name}</span>
-                <span><img src={f.away.logo} alt="" />{f.away.name}</span>
-              </div>
-              <div className="trends-card-right">
-                {isLocked ? (
-                  <span className="trends-lock"><Lock size={12} /> Premium</span>
-                ) : (
-                  <span className="trends-cta">Ver análisis →</span>
-                )}
-              </div>
+        {fixtures.slice(0, 10).map((f) => (
+          <div key={f.id} className="trends-card" onClick={() => onOpen(f)}>
+            <div className="trends-card-teams">
+              <span><img src={f.home.logo} alt="" />{f.home.name}</span>
+              <span><img src={f.away.logo} alt="" />{f.away.name}</span>
             </div>
-          );
-        })}
+            {unlocked ? (
+              <span className="trends-cta">Ver análisis →</span>
+            ) : (
+              <span className="trends-lock"><Lock size={12} /> Premium</span>
+            )}
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -602,17 +466,14 @@ function TrendsPreview({ trendLeague, setTrendLeague, fixtures, loading, onOpen,
 
 function TrendsDetail({ fixture, homeTrends, awayTrends, loading, onBack }) {
   return (
-    <div className="panel" style={{ maxWidth: 780 }}>
+    <div className="panel" style={{ maxWidth: 820 }}>
       <button className="link-row" style={{ marginBottom: 20 }} onClick={onBack}><ArrowLeft size={14} /> Volver</button>
-
       <div className="trends-matchup">
         <div className="trends-matchup-team"><img src={fixture.home.logo} alt="" />{fixture.home.name}</div>
         <span className="trends-vs">VS</span>
         <div className="trends-matchup-team"><img src={fixture.away.logo} alt="" />{fixture.away.name}</div>
       </div>
-
       {loading && <p className="desc" style={{ textAlign: "center" }}>Calculando tendencias de los últimos partidos...</p>}
-
       {!loading && homeTrends && awayTrends && (
         <div className="trends-team-columns">
           <TeamTrendCard team={fixture.home} trends={homeTrends} />
@@ -624,6 +485,7 @@ function TrendsDetail({ fixture, homeTrends, awayTrends, loading, onBack }) {
 }
 
 function TeamTrendCard({ team, trends }) {
+  const [market, setMarket] = useState("matchGoals");
   if (!trends || trends.error) {
     return (
       <div className="box">
@@ -632,96 +494,46 @@ function TeamTrendCard({ team, trends }) {
       </div>
     );
   }
-  const m = trends.matches || [];
+  const m = trends.metrics?.[market] || {};
+  const matches = trends.matches || [];
+  const maxVal = Math.max(1, ...matches.map((row) => row[market] ?? 0));
+
   return (
     <div className="box">
-      <p style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, marginBottom: 12 }}><img src={team.logo} alt="" style={{ width: 20 }} />{team.name}</p>
-      <div className="trend-stat-grid">
-        <div className="trend-stat-box"><div className="trend-stat-num">{trends.bttsPct ?? "—"}%</div><div className="trend-stat-lbl">BTTS</div></div>
-        <div className="trend-stat-box"><div className="trend-stat-num">{trends.over25Pct ?? "—"}%</div><div className="trend-stat-lbl">Over 2.5</div></div>
-        <div className="trend-stat-box"><div className="trend-stat-num">{trends.avgShotsOnGoal ?? "—"}</div><div className="trend-stat-lbl">Tiros arco/PJ</div></div>
-        <div className="trend-stat-box"><div className="trend-stat-num">{trends.avgCorners ?? "—"}</div><div className="trend-stat-lbl">Córners/PJ</div></div>
-        <div className="trend-stat-box" style={{ gridColumn: "1 / -1" }}><div className="trend-stat-num">{trends.avgCards ?? "—"}</div><div className="trend-stat-lbl">Tarjetas/PJ (últimos {trends.sampleSize || 0})</div></div>
-      </div>
-      {m.length > 0 && (
-        <table className="ln-table">
-          <thead><tr><th>Rival</th><th>G</th><th>Tiros</th><th>Córn.</th><th>Tarj.</th></tr></thead>
-          <tbody>
-            {m.map((row, i) => (
-              <tr key={i}>
-                <td>{row.home ? "vs " : "@ "}{row.rival}</td>
-                <td>{row.goalsFor}-{row.goalsAgainst}</td>
-                <td>{row.shots ?? "—"}</td>
-                <td>{row.corners ?? "—"}</td>
-                <td>{row.cards ?? "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </div>
-  );
-}
+      <p style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 700, marginBottom: 4 }}><img src={team.logo} alt="" style={{ width: 20 }} />{team.name}</p>
+      <p style={{ fontSize: 11, color: "var(--muted)", marginBottom: 12 }}>BTTS {trends.bttsPct ?? "—"}% · Valla invicta {trends.cleanSheetPct ?? "—"}% (últimos {trends.sampleSize || 0})</p>
 
-function CornerSummary({ freePick, premiumPick }) {
-  return (
-    <div className="corner-summary">
-      <div className="corner-summary-head">
-        <span className="dot-live" /> RESUMEN DE HOY
+      <div className="market-tabs">
+        {MARKET_TABS.map((t) => (
+          <button key={t.key} className={`market-tab ${market === t.key ? "active" : ""}`} onClick={() => setMarket(t.key)}>{t.label}</button>
+        ))}
       </div>
-      <div className="corner-summary-row">
-        <span className="corner-summary-tag free">FREE</span>
-        <span className="corner-summary-text">{freePick}</span>
-      </div>
-      <div className="corner-summary-row">
-        <span className="corner-summary-tag premium">PREMIUM</span>
-        <span className="corner-summary-text">{premiumPick}</span>
-      </div>
-    </div>
-  );
-}
 
-function FreeForm({ freePick, onBack, onRegistered }) {
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
-  const [sending, setSending] = useState(false);
-
-  async function submit(e) {
-    e.preventDefault();
-    const clean = email.trim().toLowerCase();
-    if (!GMAIL_RE.test(clean)) { setError("Ingresá un correo de Gmail válido (ejemplo@gmail.com)."); return; }
-    setError(""); setSending(true);
-    try {
-      await insertFreeSub(clean);
-      onRegistered(clean);
-      setDone(true);
-    } catch (err) {
-      setError("No se pudo registrar. Probá de nuevo en un momento.");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  return (
-    <div className="panel" style={{ maxWidth: 440 }}>
-      <button className="link-row" style={{ marginBottom: 20 }} onClick={onBack}><ArrowLeft size={14} /> Volver</button>
-      {!done ? (
-        <form className="card" onSubmit={submit}>
-          <h2>Pick gratis</h2>
-          <label className="field-label">Tu Gmail</label>
-          <input className="ln-input" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tunombre@gmail.com" />
-          {error && <p style={{ color: "#ff6b6b", fontSize: 12, marginBottom: 12 }}>{error}</p>}
-          <button className="btn ghost" type="submit" disabled={sending}>{sending ? "Registrando..." : "Recibir pick gratuito"}</button>
-        </form>
-      ) : (
-        <div className="card" style={{ textAlign: "center" }}>
-          <CheckCircle2 size={36} color="#5be89a" style={{ margin: "0 auto 12px" }} />
-          <p style={{ fontWeight: 700 }}>¡Listo! Quedaste registrado.</p>
-          <p className="desc" style={{ marginTop: 8 }}>También te lo dejamos acá:</p>
-          <div className="box" style={{ color: "var(--gold)" }}>{freePick}</div>
+      <div className="metric-summary">
+        <span className="line-badge">Línea ref.: {m.line ?? "—"}</span>
+        <div className="hitrate">
+          <div className="pct">{m.overPct ?? "—"}%</div>
+          <div className="lbl">Por encima</div>
         </div>
-      )}
+      </div>
+
+      <div className="bar-chart">
+        {m.line != null && (
+          <div className="ref-line" style={{ bottom: `${Math.min(95, (m.line / maxVal) * 100)}%` }}>{m.line}</div>
+        )}
+        {matches.map((row, i) => {
+          const val = row[market];
+          const h = val == null ? 0 : Math.max(4, (val / maxVal) * 100);
+          const over = m.line != null && val > m.line;
+          return (
+            <div className="bar-col" key={i}>
+              <span className="bar-val">{val ?? "—"}</span>
+              <div className={`bar-rect ${over ? "over" : "under"}`} style={{ height: `${h}%` }} />
+              <span className="bar-lbl">{row.rival.slice(0, 10)}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -764,8 +576,9 @@ function PremiumForm({ zelleInfo, onBack, onRegistered }) {
     <div className="panel" style={{ maxWidth: 460 }}>
       <button className="link-row" style={{ marginBottom: 20 }} onClick={onBack}><ArrowLeft size={14} /> Volver</button>
       {!done ? (
-        <div className="card premium" style={{ background: "var(--card)" }}>
-          <h2 style={{ background: "none", WebkitTextFillColor: "unset", color: "var(--gold)" }}>Acceso premium</h2>
+        <div className="card" style={{ borderColor: "rgba(18,214,196,0.3)" }}>
+          <h2 style={{ color: "var(--gold)" }}>Acceso premium</h2>
+          <p className="desc">Desbloqueá el análisis completo de todas las ligas y partidos, sin límite.</p>
           <div className="box">
             <p className="field-label" style={{ display: "flex", alignItems: "center", gap: 6 }}><CreditCard size={13} /> Pagá por Zelle</p>
             <p style={{ fontSize: 13.5 }}>Monto: <b style={{ color: "var(--gold)" }}>{zelleInfo.price}</b></p>
@@ -791,8 +604,8 @@ function PremiumForm({ zelleInfo, onBack, onRegistered }) {
           <Clock size={36} color="var(--gold)" style={{ margin: "0 auto 12px" }} />
           <p style={{ fontWeight: 700 }}>Comprobante recibido</p>
           <p className="desc" style={{ marginTop: 8 }}>
-            Tu pago queda <b style={{ color: "var(--gold)" }}>pendiente de verificación</b>. Una vez aprobado te
-            llega el pick premium a tu Gmail. Podés volver y revisar tu estado con "Ya me registré".
+            Tu pago queda <b style={{ color: "var(--gold)" }}>pendiente de verificación</b>. En menos de 24hs lo revisamos.
+            Volvé acá y tocá "Ya pagué, quiero activar mi acceso" para desbloquear.
           </p>
         </div>
       )}
@@ -800,7 +613,7 @@ function PremiumForm({ zelleInfo, onBack, onRegistered }) {
   );
 }
 
-function StatusLookup({ premiumPick, onBack }) {
+function StatusLookup({ onBack, onUnlock }) {
   const [email, setEmail] = useState("");
   const [result, setResult] = useState(undefined);
   const [searching, setSearching] = useState(false);
@@ -811,7 +624,9 @@ function StatusLookup({ premiumPick, onBack }) {
     const clean = email.trim().toLowerCase();
     try {
       const rows = await searchPremiumByEmail(clean);
-      setResult(rows && rows.length > 0 ? rows[0] : null);
+      const found = rows && rows.length > 0 ? rows[0] : null;
+      setResult(found);
+      if (found?.status === "approved") onUnlock(clean);
     } catch (err) {
       setResult(null);
     } finally {
@@ -823,15 +638,15 @@ function StatusLookup({ premiumPick, onBack }) {
     <div className="panel" style={{ maxWidth: 440 }}>
       <button className="link-row" style={{ marginBottom: 20 }} onClick={onBack}><ArrowLeft size={14} /> Volver</button>
       <form className="card" onSubmit={search}>
-        <h2>Consultar estado</h2>
+        <h2>Activar mi acceso</h2>
         <div style={{ display: "flex", gap: 8 }}>
           <input className="ln-input" style={{ marginBottom: 0 }} value={email} onChange={(e) => setEmail(e.target.value)} placeholder="tunombre@gmail.com" />
           <button className="btn ghost" style={{ width: "auto", padding: "0 18px" }} type="submit" disabled={searching}>{searching ? "..." : "Buscar"}</button>
         </div>
-        {result === null && <p className="desc" style={{ marginTop: 14 }}>No encontramos ese correo registrado en premium.</p>}
+        {result === null && <p className="desc" style={{ marginTop: 14 }}>No encontramos ese correo registrado.</p>}
         {result && (
           <div className="box" style={{ marginTop: 14 }}>
-            {result.status === "approved" && (<><p style={{ color: "#5be89a", fontWeight: 700, fontSize: 13 }}>✓ Aprobado</p><p style={{ color: "var(--gold)", marginTop: 8 }}>{premiumPick}</p></>)}
+            {result.status === "approved" && <p style={{ color: "#5be89a", fontWeight: 700, fontSize: 13 }}>✓ Aprobado — acceso desbloqueado</p>}
             {result.status === "pending" && <p style={{ color: "var(--gold)", fontWeight: 700, fontSize: 13 }}>⏳ Pendiente de verificación</p>}
             {result.status === "rejected" && <p style={{ color: "#ff6b6b", fontWeight: 700, fontSize: 13 }}>Pago no verificado. Escribinos para resolverlo.</p>}
           </div>
@@ -866,14 +681,7 @@ function AdminLogin({ onBack, onSuccess }) {
       <form className="card" onSubmit={submit}>
         <Lock size={28} color="var(--gold)" />
         <h2 style={{ marginTop: 14 }}>Acceso admin</h2>
-        <input
-          className="ln-input"
-          type="password"
-          value={pw}
-          onChange={(e) => setPw(e.target.value)}
-          placeholder="Contraseña"
-          autoFocus
-        />
+        <input className="ln-input" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Contraseña" autoFocus />
         {error && <p style={{ color: "#ff6b6b", fontSize: 12, marginBottom: 12 }}>{error}</p>}
         <button className="btn solid" type="submit" disabled={checking}>{checking ? "Verificando..." : "Entrar"}</button>
         <button type="button" className="link-row" style={{ marginTop: 10, justifyContent: "center" }} onClick={onBack}>Volver al sitio</button>
@@ -887,40 +695,26 @@ function gmailComposeUrl(emails, subject, body) {
   const params = new URLSearchParams({ view: "cm", fs: "1", tf: "1", bcc, su: subject, body });
   return `https://mail.google.com/mail/?${params.toString()}`;
 }
-function copyToClipboard(text) {
-  if (navigator.clipboard) navigator.clipboard.writeText(text);
-}
+function copyToClipboard(text) { if (navigator.clipboard) navigator.clipboard.writeText(text); }
 
-function AdminPanel({ loaded, dbError, adminPassword, freePick, setFreePick, premiumPick, setPremiumPick, zelleInfo, setZelleInfo, winRate, setWinRate, baseMembers, setBaseMembers, freeSubs, premiumSubs, onApprove, onReject, onExit }) {
+function AdminPanel({ loaded, dbError, adminPassword, zelleInfo, setZelleInfo, winRate, setWinRate, baseMembers, setBaseMembers, freeSubs, premiumSubs, onApprove, onReject, onExit }) {
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
   const approvedPremiumEmails = premiumSubs.filter((p) => p.status === "approved").map((p) => p.email);
-  const freeEmails = freeSubs.map((s) => s.email);
   const BATCH = 50;
 
-  function notify(emails, pickText, label) {
+  function notifyApproved(emails) {
     if (emails.length === 0) return;
-    const subject = `Tu pick ${label} de hoy — Yoan Sport`;
-    const body = `Acá tenés el pick de hoy:\n\n${pickText}\n\n— Yoan Sport`;
-    for (let i = 0; i < emails.length; i += BATCH) {
-      window.open(gmailComposeUrl(emails.slice(i, i + BATCH), subject, body), "_blank");
-    }
+    const subject = "Tu acceso premium a Yoan Sport está activo";
+    const body = `Ya podés entrar a yoan-sport.vercel.app y activar tu acceso con este mismo correo, tocando "Ya pagué, quiero activar mi acceso".\n\n— Yoan Sport`;
+    for (let i = 0; i < emails.length; i += BATCH) window.open(gmailComposeUrl(emails.slice(i, i + BATCH), subject, body), "_blank");
   }
 
   async function saveSettings() {
-    setSaving(true);
-    setSavedMsg("");
+    setSaving(true); setSavedMsg("");
     try {
       await adminWrite(adminPassword, "settings", {
-        settings: {
-          free_pick: freePick,
-          premium_pick: premiumPick,
-          zelle_name: zelleInfo.name,
-          zelle_handle: zelleInfo.handle,
-          zelle_price: zelleInfo.price,
-          win_rate: winRate,
-          base_members: Number(baseMembers) || 0,
-        },
+        settings: { zelle_name: zelleInfo.name, zelle_handle: zelleInfo.handle, zelle_price: zelleInfo.price, win_rate: winRate, base_members: Number(baseMembers) || 0 },
       });
       setSavedMsg("Guardado ✓");
     } catch (err) {
@@ -942,12 +736,17 @@ function AdminPanel({ loaded, dbError, adminPassword, freePick, setFreePick, pre
       {!loaded && <p className="desc">Cargando datos desde Supabase...</p>}
 
       <div className="box">
-        <label className="field-label">Pick free de hoy</label>
-        <textarea className="ln-input" rows={3} value={freePick} onChange={(e) => setFreePick(e.target.value)} />
-      </div>
-      <div className="box">
-        <label className="field-label">Pick premium de hoy</label>
-        <textarea className="ln-input" rows={3} value={premiumPick} onChange={(e) => setPremiumPick(e.target.value)} />
+        <label className="field-label">Estadísticas mostradas en la página principal</label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div>
+            <label className="field-label" style={{ marginTop: 0 }}>% Acierto 7D</label>
+            <input className="ln-input" style={{ marginBottom: 0 }} value={winRate} onChange={(e) => setWinRate(e.target.value)} placeholder="62%" />
+          </div>
+          <div>
+            <label className="field-label" style={{ marginTop: 0 }}>Miembros base</label>
+            <input className="ln-input" style={{ marginBottom: 0 }} type="number" value={baseMembers} onChange={(e) => setBaseMembers(e.target.value)} placeholder="20" />
+          </div>
+        </div>
       </div>
       <div className="box">
         <label className="field-label">Datos de Zelle mostrados a usuarios</label>
@@ -957,45 +756,9 @@ function AdminPanel({ loaded, dbError, adminPassword, freePick, setFreePick, pre
           <input className="ln-input" style={{ marginBottom: 0 }} value={zelleInfo.price} onChange={(e) => setZelleInfo((z) => ({ ...z, price: e.target.value }))} placeholder="Precio" />
         </div>
       </div>
-      <div className="box">
-        <label className="field-label">Estadísticas mostradas en la página principal</label>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <div>
-            <label className="field-label" style={{ marginTop: 0 }}>% Acierto 7D</label>
-            <input className="ln-input" style={{ marginBottom: 0 }} value={winRate} onChange={(e) => setWinRate(e.target.value)} placeholder="62%" />
-          </div>
-          <div>
-            <label className="field-label" style={{ marginTop: 0 }}>Miembros base (arranca acá, después suma los reales)</label>
-            <input className="ln-input" style={{ marginBottom: 0 }} type="number" value={baseMembers} onChange={(e) => setBaseMembers(e.target.value)} placeholder="20" />
-          </div>
-        </div>
-      </div>
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 30 }}>
-        <button className="btn solid" style={{ width: "auto", padding: "10px 20px" }} onClick={saveSettings} disabled={saving}>
-          {saving ? "Guardando..." : "Guardar cambios"}
-        </button>
+        <button className="btn solid" style={{ width: "auto", padding: "10px 20px" }} onClick={saveSettings} disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</button>
         {savedMsg && <span style={{ fontSize: 12, color: savedMsg.includes("Error") ? "#ff6b6b" : "#5be89a" }}>{savedMsg}</span>}
-      </div>
-
-      <h3 className="field-label" style={{ marginTop: 30 }}>Registrados free ({freeSubs.length})</h3>
-      <div className="box">
-        {freeSubs.length === 0 && <p className="desc">Todavía no hay registros.</p>}
-        {freeSubs.map((s, i) => (
-          <div key={i} className="row-between" style={{ padding: "8px 0", borderBottom: i < freeSubs.length - 1 ? "1px solid rgba(255,255,255,0.06)" : "none" }}>
-            <span style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 8 }}><Mail size={13} color="var(--muted)" />{s.email}</span>
-            <span style={{ fontSize: 11, color: "var(--muted)" }}>{s.created_at ? new Date(s.created_at).toLocaleString() : ""}</span>
-          </div>
-        ))}
-        {freeEmails.length > 0 && (
-          <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-            <button className="btn solid" style={{ width: "auto", padding: "9px 16px" }} onClick={() => notify(freeEmails, freePick, "free")}>
-              Notificar free por Gmail ({freeEmails.length})
-            </button>
-            <button className="btn ghost" style={{ width: "auto", padding: "9px 16px" }} onClick={() => copyToClipboard(freeEmails.join(", "))}>
-              Copiar emails
-            </button>
-          </div>
-        )}
       </div>
 
       <h3 className="field-label" style={{ marginTop: 30 }}>Registrados premium ({premiumSubs.length})</h3>
@@ -1022,19 +785,15 @@ function AdminPanel({ loaded, dbError, adminPassword, freePick, setFreePick, pre
         ))}
         {approvedPremiumEmails.length > 0 && (
           <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-            <button className="btn solid" style={{ width: "auto", padding: "9px 16px" }} onClick={() => notify(approvedPremiumEmails, premiumPick, "premium")}>
-              Notificar premium aprobados por Gmail ({approvedPremiumEmails.length})
-            </button>
-            <button className="btn ghost" style={{ width: "auto", padding: "9px 16px" }} onClick={() => copyToClipboard(approvedPremiumEmails.join(", "))}>
-              Copiar emails
-            </button>
+            <button className="btn solid" style={{ width: "auto", padding: "9px 16px" }} onClick={() => notifyApproved(approvedPremiumEmails)}>Avisar aprobados por Gmail ({approvedPremiumEmails.length})</button>
+            <button className="btn ghost" style={{ width: "auto", padding: "9px 16px" }} onClick={() => copyToClipboard(approvedPremiumEmails.join(", "))}>Copiar emails</button>
           </div>
         )}
       </div>
 
       <p style={{ fontSize: 11, color: "var(--muted)", marginTop: 20, lineHeight: 1.6 }}>
-        Los registros ahora se guardan de verdad en tu base de datos de Supabase — no se pierden al recargar.
-        "Notificar por Gmail" te abre una pestaña con los correos en CCO y el pick cargado; solo apretás Enviar.
+        El acceso al análisis ya no depende de un "pick" — quien queda aprobado puede ver todas las ligas y
+        partidos sin límite, activándolo con su Gmail en "Ya pagué, quiero activar mi acceso".
       </p>
     </div>
   );

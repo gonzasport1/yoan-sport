@@ -53,8 +53,7 @@ export default async function handler(req, res) {
       const isHome = f.teams.home.id === Number(teamId);
       const goalsFor = isHome ? f.goals.home : f.goals.away;
       const goalsAgainst = isHome ? f.goals.away : f.goals.home;
-      let shots = null, corners = null, cards = null;
-
+      let shots = null, totalShots = null, corners = null, cards = null, fouls = null;
       try {
         const statsRes = await fetch(`${API_BASE}/fixtures/statistics?fixture=${f.fixture.id}`, {
           headers: { "x-apisports-key": API_KEY },
@@ -64,7 +63,9 @@ export default async function handler(req, res) {
         if (teamStats) {
           const get = (type) => teamStats.statistics.find((s) => s.type === type)?.value;
           shots = get("Shots on Goal");
+          totalShots = get("Total Shots");
           corners = get("Corner Kicks");
+          fouls = get("Fouls");
           const yellow = Number(get("Yellow Cards")) || 0;
           const red = Number(get("Red Cards")) || 0;
           cards = yellow + red;
@@ -79,27 +80,45 @@ export default async function handler(req, res) {
         home: isHome,
         goalsFor,
         goalsAgainst,
+        matchGoals: (goalsFor ?? 0) + (goalsAgainst ?? 0),
         shots,
+        totalShots,
         corners,
         cards,
+        fouls,
+        cleanSheet: goalsAgainst === 0,
         btts: goalsFor > 0 && goalsAgainst > 0,
-        over25: goalsFor + goalsAgainst > 2.5,
       });
     }
 
     const nums = (arr) => arr.filter((v) => typeof v === "number");
     const avg = (arr) => (arr.length ? Math.round((arr.reduce((a, b) => a + b, 0) / arr.length) * 10) / 10 : null);
     const pct = (arr, pred) => (arr.length ? Math.round((arr.filter(pred).length / arr.length) * 100) : null);
+    // Línea de referencia estadística (NO es una cuota real de casa de apuestas):
+    // el promedio del propio equipo, redondeado a la media más cercana.
+    const refLine = (a) => (a == null ? null : Math.round(a * 2) / 2 + (Number.isInteger(a * 2) ? 0.5 : 0));
+
+    const metricSummary = (key) => {
+      const values = nums(matches.map((m) => m[key]));
+      const average = avg(values);
+      const line = refLine(average);
+      const overPct = values.length && line != null ? Math.round((values.filter((v) => v > line).length / values.length) * 100) : null;
+      return { avg: average, line, overPct, sample: values.length };
+    };
 
     const summary = {
       teamId: Number(teamId),
-      teamName: matches.length ? undefined : undefined,
       sampleSize: matches.length,
-      avgShotsOnGoal: avg(nums(matches.map((m) => m.shots))),
-      avgCorners: avg(nums(matches.map((m) => m.corners))),
-      avgCards: avg(nums(matches.map((m) => m.cards))),
       bttsPct: pct(matches, (m) => m.btts),
-      over25Pct: pct(matches, (m) => m.over25),
+      cleanSheetPct: pct(matches, (m) => m.cleanSheet),
+      metrics: {
+        matchGoals: metricSummary("matchGoals"),
+        corners: metricSummary("corners"),
+        cards: metricSummary("cards"),
+        fouls: metricSummary("fouls"),
+        totalShots: metricSummary("totalShots"),
+        shotsOnTarget: metricSummary("shots"),
+      },
       matches,
     };
 

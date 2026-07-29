@@ -145,7 +145,8 @@ const GLOBAL_CSS = `
   .trends-section-head{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:6px; }
   .trends-title{ font-family:'Bebas Neue', sans-serif; font-size:24px; letter-spacing:1px; color:var(--text); }
   .trends-subtitle{ color:var(--muted); font-size:12.5px; margin-bottom:16px; }
-  .league-select{ background:var(--card); border:1px solid rgba(255,255,255,0.12); color:var(--text); border-radius:8px; padding:8px 12px; font-size:12.5px; }
+  .league-select{ background:var(--card); border:1px solid rgba(255,255,255,0.12); color:var(--text); border-radius:8px; padding:8px 12px; font-size:12.5px; color-scheme: dark; }
+  .league-select option{ background:#0b1214; color:#eef4f2; }
   .trends-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   @media (max-width:640px){ .trends-grid{ grid-template-columns:1fr; } }
   .trends-card{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid rgba(255,255,255,0.08); border-radius:12px; background:var(--card); cursor:pointer; transition:border-color .15s; }

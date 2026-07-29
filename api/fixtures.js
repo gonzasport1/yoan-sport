@@ -13,15 +13,38 @@ export default async function handler(req, res) {
     return;
   }
 
-  const season = new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
 
-  try {
-    const r = await fetch(`${API_BASE}/fixtures?league=${league}&season=${season}&next=20`, {
+  async function tryFetch(season, params) {
+    const r = await fetch(`${API_BASE}/fixtures?league=${league}&season=${season}&${params}`, {
       headers: { "x-apisports-key": API_KEY },
     });
     const data = await r.json();
+    return data.response || [];
+  }
 
-    const items = (data.response || []).map((f) => ({
+  async function fetchWithFallback(params) {
+    let raw = await tryFetch(currentYear, params);
+    if (raw.length === 0) raw = await tryFetch(currentYear - 1, params);
+    return raw;
+  }
+
+  try {
+    const [upcoming, recent] = await Promise.all([
+      fetchWithFallback("next=15"),
+      fetchWithFallback("last=5"),
+    ]);
+
+    const merged = [...recent, ...upcoming];
+    const seen = new Set();
+    const unique = merged.filter((f) => {
+      if (seen.has(f.fixture.id)) return false;
+      seen.add(f.fixture.id);
+      return true;
+    });
+    unique.sort((a, b) => new Date(a.fixture.date) - new Date(b.fixture.date));
+
+    const items = unique.map((f) => ({
       id: f.fixture.id,
       date: f.fixture.date,
       status: f.fixture.status?.short,

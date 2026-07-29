@@ -13,6 +13,8 @@ const TREND_LEAGUES = [
   { id: 2, name: "Champions League", flag: "🇪🇺" },
   { id: 71, name: "Brasileirão", flag: "🇧🇷" },
   { id: 262, name: "Liga MX", flag: "🇲🇽" },
+  { id: 128, name: "Liga Profesional Argentina", flag: "🇦🇷" },
+  { id: 253, name: "MLS", flag: "🇺🇸" },
 ];
 
 const MARKET_TABS = [

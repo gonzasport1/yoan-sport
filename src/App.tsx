@@ -7,6 +7,7 @@ import { Header } from './components/Header';
 import { BottomNavBar } from './components/BottomNavBar';
 import { DashboardView } from './components/DashboardView';
 import { HistoryView } from './components/HistoryView';
+import { LiveView } from './components/LiveView';
 import { TicketScannerView } from './components/TicketScannerView';
 import { SearchModal } from './components/SearchModal';
 import { ProfileModal } from './components/ProfileModal';
@@ -212,6 +213,8 @@ export default function App() {
                 onNavigateToHistory={() => setActiveTab('history')}
               />
             )}
+
+            {activeTab === 'live' && <LiveView />}
 
             {activeTab === 'history' && (
               <HistoryView

@@ -73,6 +73,7 @@ Return ONLY pure JSON without markdown codeblocks or extra text.`;
       });
     }
   } catch (err) {
+    console.error("Error en scan-ticket:", err.message);
     res.status(500).json({ error: err.message });
   }
 }

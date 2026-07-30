@@ -304,7 +304,7 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
               </p>
             </div>
             <span className="font-mono-custom text-xs text-[#d0bcff] font-bold">
-              Confianza: {Math.round(scannedResult.confidence * 100)}%
+              Confianza de lectura: {Math.round(scannedResult.confidence * 100)}%
             </span>
           </div>
 
@@ -332,6 +332,10 @@ export const TicketScannerView: React.FC<TicketScannerViewProps> = ({
               <div className="bg-[#1b1b1d] p-3 rounded-xl border border-[#494454]/30">
                 <span className="font-mono-custom text-[10px] text-[#cbc3d7] uppercase block">Importe (Stake)</span>
                 <span className="font-mono-custom font-bold text-base text-[#4edea3]">{scannedResult.stake.toFixed(1)}u</span>
+              </div>
+              <div className="bg-[#1b1b1d] p-3 rounded-xl border border-[#494454]/30 col-span-2">
+                <span className="font-mono-custom text-[10px] text-[#cbc3d7] uppercase block">Probabilidad implícita (según la cuota)</span>
+                <span className="font-mono-custom font-bold text-base text-[#d0bcff]">{Math.round((1 / scannedResult.odds) * 100)}%</span>
               </div>
             </div>
           </div>

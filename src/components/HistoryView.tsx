@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bet, BetStatus, SportCategory } from '../types';
 import { calculateBetStats, formatUnit } from '../utils/calcStats';
 
@@ -9,6 +9,47 @@ interface HistoryViewProps {
   onSelectBet: (bet: Bet) => void;
   onNavigateToScanner: () => void;
 }
+
+const LiveProgressBar: React.FC<{ bet: Bet }> = ({ bet }) => {
+  const [progress, setProgress] = useState<{ available: boolean; current?: number; line?: number; percent?: number; hit?: boolean; status?: string; reason?: string } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    async function check() {
+      try {
+        const res = await fetch('/api/live-progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ eventName: bet.eventName, sport: bet.sport, market: bet.market }),
+        });
+        const data = await res.json();
+        if (active) setProgress(data);
+      } catch (err) {
+        if (active) setProgress({ available: false });
+      }
+    }
+    check();
+    const id = setInterval(check, 30000);
+    return () => { active = false; clearInterval(id); };
+  }, [bet.eventName, bet.sport, bet.market]);
+
+  if (!progress || !progress.available) return null;
+
+  return (
+    <div className="mt-2 pt-2 border-t border-[#494454]/30">
+      <div className="flex items-center justify-between mb-1">
+        <span className="font-mono-custom text-[10px] text-[#4edea3] uppercase font-bold">🔴 EN VIVO — {progress.status}</span>
+        <span className="font-mono-custom text-[10px] text-[#cbc3d7]">{progress.current} / {progress.line}</span>
+      </div>
+      <div className="w-full h-2 bg-[#1b1b1d] rounded-full overflow-hidden">
+        <div
+          className={`h-full transition-all duration-500 ${progress.hit ? 'bg-[#4edea3]' : 'bg-[#a078ff]'}`}
+          style={{ width: `${progress.percent}%` }}
+        />
+      </div>
+    </div>
+  );
+};
 
 export const HistoryView: React.FC<HistoryViewProps> = ({
   bets,
@@ -260,6 +301,8 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
                     </p>
                   </div>
                 </div>
+
+                {isPending && <LiveProgressBar bet={bet} />}
               </div>
             );
           })

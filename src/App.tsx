@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { Bet, BetStatus, ViewTab, UserProfile } from './types';
-import { INITIAL_BETS } from './data/initialBets';
+import { supabase } from './lib/supabaseClient';
+import { AuthView } from './components/AuthView';
 import { Header } from './components/Header';
 import { BottomNavBar } from './components/BottomNavBar';
 import { DashboardView } from './components/DashboardView';
@@ -10,144 +12,220 @@ import { SearchModal } from './components/SearchModal';
 import { ProfileModal } from './components/ProfileModal';
 import { BetDetailModal } from './components/BetDetailModal';
 
-export default function App() {
-  const [bets, setBets] = useState<Bet[]>(() => {
-    try {
-      const saved = localStorage.getItem('bettracker_bets');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load saved bets:', e);
-    }
-    return INITIAL_BETS;
-  });
+const DEFAULT_PROFILE: UserProfile = {
+  name: 'Apostador Pro',
+  bankroll: 500.0,
+  preferredCurrency: 'EUR',
+  avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+};
 
-  const [profile, setProfile] = useState<UserProfile>(() => {
-    try {
-      const savedProf = localStorage.getItem('bettracker_profile');
-      if (savedProf) {
-        return JSON.parse(savedProf);
-      }
-    } catch (e) {
-      console.error('Failed to load profile:', e);
-    }
-    return {
-      name: 'Apostador Pro',
-      bankroll: 500.0,
-      preferredCurrency: 'EUR',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80'
-    };
-  });
+function rowToBet(row: any): Bet {
+  return {
+    id: row.id,
+    eventName: row.event_name,
+    sport: row.sport,
+    market: row.market,
+    odds: Number(row.odds),
+    stake: Number(row.stake),
+    date: row.date,
+    status: row.status,
+    ticketCode: row.ticket_code || undefined,
+    notes: row.notes || undefined,
+    ticketImage: row.ticket_image || undefined,
+  };
+}
+
+export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [bets, setBets] = useState<Bet[]>([]);
+  const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
+  const [dataLoading, setDataLoading] = useState(false);
 
   const [activeTab, setActiveTab] = useState<ViewTab>('dashboard');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [selectedBetDetail, setSelectedBetDetail] = useState<Bet | null>(null);
 
-  // Sync bets to local storage
   useEffect(() => {
-    try {
-      localStorage.setItem('bettracker_bets', JSON.stringify(bets));
-    } catch (e) {
-      console.error('Failed to save bets:', e);
-    }
-  }, [bets]);
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setAuthLoading(false);
+    });
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
-  // Sync profile to local storage
   useEffect(() => {
-    try {
-      localStorage.setItem('bettracker_profile', JSON.stringify(profile));
-    } catch (e) {
-      console.error('Failed to save profile:', e);
+    if (!session) {
+      setBets([]);
+      setProfile(DEFAULT_PROFILE);
+      return;
     }
-  }, [profile]);
+    (async () => {
+      setDataLoading(true);
+      const userId = session.user.id;
 
-  const handleUpdateProfile = (updated: Partial<UserProfile>) => {
-    setProfile((prev) => ({ ...prev, ...updated }));
+      const [{ data: betsData }, { data: profileData }] = await Promise.all([
+        supabase.from('bettracker_bets').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('bettracker_profiles').select('*').eq('user_id', userId).maybeSingle(),
+      ]);
+
+      setBets((betsData || []).map(rowToBet));
+
+      if (profileData) {
+        setProfile({
+          name: profileData.name,
+          bankroll: Number(profileData.bankroll),
+          preferredCurrency: profileData.preferred_currency,
+          avatarUrl: profileData.avatar_url || undefined,
+        });
+      } else {
+        await supabase.from('bettracker_profiles').insert({
+          user_id: userId,
+          name: DEFAULT_PROFILE.name,
+          bankroll: DEFAULT_PROFILE.bankroll,
+          preferred_currency: DEFAULT_PROFILE.preferredCurrency,
+          avatar_url: DEFAULT_PROFILE.avatarUrl,
+        });
+        setProfile(DEFAULT_PROFILE);
+      }
+      setDataLoading(false);
+    })();
+  }, [session]);
+
+  const handleUpdateProfile = async (updated: Partial<UserProfile>) => {
+    if (!session) return;
+    const merged = { ...profile, ...updated };
+    setProfile(merged);
+    await supabase.from('bettracker_profiles').update({
+      name: merged.name,
+      bankroll: merged.bankroll,
+      preferred_currency: merged.preferredCurrency,
+      avatar_url: merged.avatarUrl,
+    }).eq('user_id', session.user.id);
   };
 
-  const handleAddBet = (newBetData: Omit<Bet, 'id'>) => {
-    const newBet: Bet = {
-      ...newBetData,
-      id: `bet-${Date.now()}`,
-    };
-    setBets((prev) => [newBet, ...prev]);
+  const handleAddBet = async (newBetData: Omit<Bet, 'id'>) => {
+    if (!session) return;
+    const { data, error } = await supabase.from('bettracker_bets').insert({
+      user_id: session.user.id,
+      event_name: newBetData.eventName,
+      sport: newBetData.sport,
+      market: newBetData.market,
+      odds: newBetData.odds,
+      stake: newBetData.stake,
+      date: newBetData.date,
+      status: newBetData.status,
+      ticket_code: newBetData.ticketCode,
+      notes: newBetData.notes,
+      ticket_image: newBetData.ticketImage,
+    }).select().single();
+
+    if (!error && data) {
+      setBets((prev) => [rowToBet(data), ...prev]);
+    }
   };
 
-  const handleStatusChange = (id: string, newStatus: BetStatus) => {
-    setBets((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b))
-    );
+  const handleStatusChange = async (id: string, newStatus: BetStatus) => {
+    setBets((prev) => prev.map((b) => (b.id === id ? { ...b, status: newStatus } : b)));
     if (selectedBetDetail && selectedBetDetail.id === id) {
       setSelectedBetDetail((prev) => (prev ? { ...prev, status: newStatus } : null));
     }
+    await supabase.from('bettracker_bets').update({ status: newStatus }).eq('id', id);
   };
 
-  const handleUpdateBet = (updatedBet: Bet) => {
-    setBets((prev) =>
-      prev.map((b) => (b.id === updatedBet.id ? updatedBet : b))
-    );
+  const handleUpdateBet = async (updatedBet: Bet) => {
+    setBets((prev) => prev.map((b) => (b.id === updatedBet.id ? updatedBet : b)));
     setSelectedBetDetail(updatedBet);
+    await supabase.from('bettracker_bets').update({
+      event_name: updatedBet.eventName,
+      market: updatedBet.market,
+      odds: updatedBet.odds,
+      stake: updatedBet.stake,
+      status: updatedBet.status,
+      notes: updatedBet.notes,
+    }).eq('id', updatedBet.id);
   };
 
-  const handleDeleteBet = (id: string) => {
+  const handleDeleteBet = async (id: string) => {
     setBets((prev) => prev.filter((b) => b.id !== id));
     if (selectedBetDetail && selectedBetDetail.id === id) {
       setSelectedBetDetail(null);
     }
+    await supabase.from('bettracker_bets').delete().eq('id', id);
   };
 
-  const handleResetBets = () => {
-    setBets(INITIAL_BETS);
-    localStorage.removeItem('bettracker_bets');
+  const handleResetBets = async () => {
+    if (!session) return;
+    await supabase.from('bettracker_bets').delete().eq('user_id', session.user.id);
+    setBets([]);
   };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setActiveTab('dashboard');
+    setIsProfileOpen(false);
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#131315] flex items-center justify-center">
+        <span className="text-[#cbc3d7] text-sm font-mono">Cargando...</span>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return <AuthView />;
+  }
 
   return (
     <div className="min-h-screen bg-[#131315] text-[#e5e1e4] relative selection:bg-[#a078ff] selection:text-[#340080]">
-      {/* Background Subtle Noise overlay */}
       <div className="fixed inset-0 pointer-events-none opacity-[0.03] bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:16px_16px]" />
 
-      {/* Main Top Header */}
       <Header
         profile={profile}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenProfile={() => setIsProfileOpen(true)}
       />
 
-      {/* Main Screen Content View Routing */}
       <main className="min-h-screen">
-        {activeTab === 'dashboard' && (
-          <DashboardView
-            bets={bets}
-            onNavigateToHistory={() => setActiveTab('history')}
-            onNavigateToScanner={() => setActiveTab('scanner')}
-            onSelectBet={(bet) => setSelectedBetDetail(bet)}
-          />
-        )}
+        {dataLoading ? (
+          <div className="pt-32 text-center text-[#cbc3d7] text-sm font-mono">Cargando tus tickets...</div>
+        ) : (
+          <>
+            {activeTab === 'dashboard' && (
+              <DashboardView
+                bets={bets}
+                onNavigateToHistory={() => setActiveTab('history')}
+                onNavigateToScanner={() => setActiveTab('scanner')}
+                onSelectBet={(bet) => setSelectedBetDetail(bet)}
+              />
+            )}
 
-        {activeTab === 'scanner' && (
-          <TicketScannerView
-            onAddBet={handleAddBet}
-            onNavigateToHistory={() => setActiveTab('history')}
-          />
-        )}
+            {activeTab === 'scanner' && (
+              <TicketScannerView
+                onAddBet={handleAddBet}
+                onNavigateToHistory={() => setActiveTab('history')}
+              />
+            )}
 
-        {activeTab === 'history' && (
-          <HistoryView
-            bets={bets}
-            onStatusChange={handleStatusChange}
-            onDeleteBet={handleDeleteBet}
-            onSelectBet={(bet) => setSelectedBetDetail(bet)}
-            onNavigateToScanner={() => setActiveTab('scanner')}
-          />
+            {activeTab === 'history' && (
+              <HistoryView
+                bets={bets}
+                onStatusChange={handleStatusChange}
+                onDeleteBet={handleDeleteBet}
+                onSelectBet={(bet) => setSelectedBetDetail(bet)}
+                onNavigateToScanner={() => setActiveTab('scanner')}
+              />
+            )}
+          </>
         )}
       </main>
 
-      {/* Floating 3D Navigation Bar */}
       <BottomNavBar
         activeTab={activeTab}
         onTabChange={(tab) => {
@@ -156,7 +234,6 @@ export default function App() {
         }}
       />
 
-      {/* Interactive Dialogs & Modals */}
       <SearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
@@ -171,6 +248,8 @@ export default function App() {
         profile={profile}
         onUpdateProfile={handleUpdateProfile}
         onResetBets={handleResetBets}
+        onLogout={handleLogout}
+        userEmail={session.user.email || ''}
       />
 
       <BetDetailModal

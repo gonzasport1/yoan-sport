@@ -9,6 +9,8 @@ interface ProfileModalProps {
   profile: UserProfile;
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
   onResetBets: () => void;
+  onLogout: () => void;
+  userEmail: string;
 }
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({
@@ -18,6 +20,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
   profile,
   onUpdateProfile,
   onResetBets,
+  onLogout,
+  userEmail,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -193,6 +197,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
           {/* Actions */}
           <div className="pt-2 space-y-2">
+            <p className="text-center font-mono-custom text-[10px] text-[#cbc3d7]/70 mb-1">{userEmail}</p>
+
             <button
               onClick={handleExportJSON}
               className="w-full py-2.5 px-4 bg-[#353437] hover:bg-[#494454] text-[#e5e1e4] rounded-xl font-mono-custom text-xs font-semibold flex items-center justify-center gap-2 active:scale-95 transition-all"
@@ -216,6 +222,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                 restart_alt
               </span>
               Restablecer Apuestas Iniciales
+            </button>
+
+            <button
+              onClick={onLogout}
+              className="w-full py-2.5 px-4 bg-transparent hover:bg-[#353437] text-[#cbc3d7] border border-[#494454] rounded-xl font-mono-custom text-xs font-semibold flex items-center justify-center gap-2 active:scale-95 transition-all"
+            >
+              <span className="material-symbols-outlined text-base" data-icon="logout">
+                logout
+              </span>
+              Cerrar Sesión
             </button>
           </div>
         </div>

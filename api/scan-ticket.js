@@ -40,7 +40,7 @@ Extract the sports betting details in valid JSON format:
 Return ONLY pure JSON without markdown codeblocks or extra text.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-flash-latest",
       contents: [
         {
           role: "user",

@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Hanken Grotesk', sans-serif;
+    background-color: #131315;
+    color: #e5e1e4;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Sora', sans-serif;
+  }
+}
+
+.font-mono-custom {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  display: inline-block;
+  vertical-align: middle;
+  line-height: 1;
+}
+
+/* 3D Tactile Card Depth Effects requested by user */
+.bet-card-depth {
+  background: linear-gradient(145deg, #252427 0%, #1b1b1d 100%);
+  box-shadow: 
+    0 6px 0 0 rgba(14, 14, 16, 0.9),
+    0 12px 24px -6px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.12),
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.4);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 3px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+}
+
+.bet-card-depth:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 0 0 rgba(14, 14, 16, 0.9),
+    0 16px 30px -8px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 0 rgba(0, 0, 0, 0.4);
+}
+
+.bet-card-depth:active {
+  transform: translateY(3px);
+  box-shadow: 
+    0 2px 0 0 rgba(14, 14, 16, 0.9),
+    0 6px 12px -3px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  border-bottom-width: 1px;
+}
+
+.won-accent { 
+  border-bottom-color: #4edea3 !important; 
+  box-shadow: 0 6px 0 0 rgba(0, 82, 54, 0.6), 0 12px 24px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(78, 222, 163, 0.2);
+}
+
+.lost-accent { 
+  border-bottom-color: #ffb4ab !important; 
+  box-shadow: 0 6px 0 0 rgba(147, 0, 10, 0.5), 0 12px 24px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 180, 171, 0.2);
+}
+
+.pending-accent { 
+  border-bottom-color: #d0bcff !important; 
+  box-shadow: 0 6px 0 0 rgba(85, 22, 190, 0.5), 0 12px 24px -6px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(208, 188, 255, 0.2);
+}
+
+.synthetic-card {
+  background: linear-gradient(135deg, rgba(38, 37, 40, 0.85) 0%, rgba(20, 20, 22, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 6px 12px -2px rgba(0, 0, 0, 0.45),
+    0 3px 6px -1px rgba(0, 0, 0, 0.3),
+    inset 0 1px 1px rgba(255, 255, 255, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  backdrop-filter: blur(12px);
+}
+
+.synthetic-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 10px 20px -4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.2);
+}
+
+.synthetic-card:active {
+  transform: translateY(2px);
+  box-shadow: 0 3px 6px -1px rgba(0, 0, 0, 0.4);
+}
+
+.three-d-card {
+  background: linear-gradient(145deg, #232225 0%, #1a1a1c 100%);
+  box-shadow: 0 5px 0 0 #0b0b0d, 0 8px 16px rgba(0,0,0,0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: all 0.15s ease;
+}
+
+.three-d-card:focus-within {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 0 #0b0b0d, 0 4px 8px rgba(0,0,0,0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.15);
+  border-color: #a078ff;
+}
+
+/* 3D Tactile Action Button */
+.accent-button {
+  background: linear-gradient(180deg, #b38fff 0%, #8c55ff 100%);
+  box-shadow: 0 6px 0 0 #340080, 0 10px 20px rgba(52, 0, 128, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.12s ease;
+  color: #1e004a;
+}
+
+.accent-button:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 7px 0 0 #340080, 0 14px 24px rgba(52, 0, 128, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
+}
+
+.accent-button:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 0 #340080, 0 4px 8px rgba(52, 0, 128, 0.3);
+}
+
+.floating-nav-button {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.floating-nav-button:active {
+  transform: scale(0.92) translateY(2px);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #131315;
+}
+::-webkit-scrollbar-thumb {
+  background: #353437;
+  border-radius: 10px;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

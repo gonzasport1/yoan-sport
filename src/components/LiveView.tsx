@@ -18,10 +18,15 @@ interface LiveGroup {
 
 const SPORT_ICON: Record<string, string> = {
   Soccer: 'sports_soccer',
-  Football: 'sports_football',
-  Basketball: 'sports_basketball',
-  Baseball: 'sports_baseball',
-  Hockey: 'sports_hockey',
+  NFL: 'sports_football',
+  NCAAF: 'sports_football',
+  NBA: 'sports_basketball',
+  NCAAB: 'sports_basketball',
+  MLB: 'sports_baseball',
+  NHL: 'sports_hockey',
+  Tennis_ATP: 'sports_tennis',
+  Tennis_WTA: 'sports_tennis',
+  MMA: 'sports_martial_arts',
 };
 
 export const LiveView: React.FC = () => {
@@ -119,11 +124,6 @@ export const LiveView: React.FC = () => {
         ))}
       </div>
 
-      <div className="mt-8 p-4 bg-[#1b1b1d] rounded-xl border border-[#494454]/30 text-center">
-        <p className="font-mono-custom text-[10px] text-[#cbc3d7]">
-          Tenis todavía no está disponible en vivo — lo dejamos pendiente para cuando consigamos esa fuente de datos.
-        </p>
-      </div>
     </div>
   );
 };

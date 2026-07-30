@@ -43,6 +43,23 @@ export const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeTab, onTabChan
         </span>
       </button>
 
+      {/* Live Tab */}
+      <button
+        onClick={() => onTabChange('live')}
+        className={`flex flex-col items-center justify-center transition-all duration-150 floating-nav-button cursor-pointer ${
+          activeTab === 'live'
+            ? 'bg-[#ff5252] text-white font-bold rounded-xl px-4 sm:px-6 py-1.5 shadow-md scale-105 border border-[#ff8a80]/40'
+            : 'text-[#cbc3d7] hover:text-[#ff5252] px-3 py-1.5'
+        }`}
+      >
+        <span className="material-symbols-outlined text-xl mb-0.5" data-icon="sensors">
+          sensors
+        </span>
+        <span className="font-mono-custom text-[11px] uppercase tracking-wide">
+          En Vivo
+        </span>
+      </button>
+
       {/* History Tab */}
       <button
         onClick={() => onTabChange('history')}

@@ -11,7 +11,7 @@ export type SportCategory =
   | 'MMA' 
   | 'Other';
 
-export type ViewTab = 'dashboard' | 'history' | 'scanner';
+export type ViewTab = 'dashboard' | 'history' | 'scanner' | 'live';
 
 export interface Bet {
   id: string;

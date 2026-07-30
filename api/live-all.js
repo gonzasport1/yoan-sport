@@ -19,6 +19,9 @@ export default async function handler(req, res) {
         headers: { "x-apisports-key": apiKey },
       });
       const data = await r.json();
+      if (data.errors && Object.keys(data.errors).length > 0) {
+        console.error(`live-all — ${cfg.sport} error:`, JSON.stringify(data.errors));
+      }
       const games = (data.response || []).map((g) => {
         const homeScore = g.goals?.home ?? g.scores?.home?.total ?? g.scores?.home ?? 0;
         const awayScore = g.goals?.away ?? g.scores?.away?.total ?? g.scores?.away ?? 0;
@@ -33,14 +36,20 @@ export default async function handler(req, res) {
           league: g.league?.name || g.league || "",
         };
       });
-      return { sport: cfg.sport, label: cfg.label, games };
+      return { sport: cfg.sport, label: cfg.label, games, rawCount: (data.response || []).length, apiErrors: data.errors };
     })
   );
+
+  const debug = SPORT_CONFIG.map((cfg, i) => {
+    const r = results[i];
+    if (r.status === "rejected") return { sport: cfg.sport, failed: true, reason: String(r.reason) };
+    return { sport: cfg.sport, failed: false, rawCount: r.value.rawCount, apiErrors: r.value.apiErrors };
+  });
 
   const groups = results
     .map((r) => (r.status === "fulfilled" ? r.value : null))
     .filter((g) => g && g.games.length > 0);
 
   res.setHeader("Cache-Control", "s-maxage=30");
-  res.status(200).json({ groups, tennisNote: "Tenis en vivo todavía no está disponible con la API actual." });
+  res.status(200).json({ groups, debug, tennisNote: "Tenis en vivo todavía no está disponible con la API actual." });
 }

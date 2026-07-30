@@ -7,6 +7,7 @@ export type SportCategory =
   | 'Soccer' 
   | 'Esports' 
   | 'Baseball' 
+  | 'Hockey'
   | 'MMA' 
   | 'Other';
 

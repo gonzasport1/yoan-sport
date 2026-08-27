@@ -1552,17 +1552,24 @@ function renderTrendsList() {
         `;
       }).join('');
     } else {
-      const mainCode = item.legs?.[0]?.team?.code || state.sport.toUpperCase();
+      const firstLegStraight = item.legs?.[0]?.straight || item.legs?.[0] || {};
+      const mainCode = firstLegStraight.team?.code || state.sport.toUpperCase();
       title = (state.activeTab === 'samegame') ? `${mainCode} SGP` : `${mainCode} Parlay`;
       subtitle = `${item.legs?.length || 0} Selecciones`;
-      logoUrl = getTeamLogoUrl(mainCode, item.legs?.[0]?.team?.name);
+      logoUrl = getTeamLogoUrl(mainCode, firstLegStraight.team?.name);
       valueOdds = `${item.legs?.length || 0} Legs`;
       
       const legsHtml = item.legs ? item.legs.map(leg => {
-        const legLogo = getTeamLogoUrl(leg.team?.code, leg.team?.name);
-        const legName = leg.player ? (leg.player.preferredName || leg.player.fullName || leg.player.lastName) : (leg.team?.code || '');
-        const legMarket = getMarketNameES(leg.market?.name);
-        const legDir = leg.outcome ? leg.outcome.toUpperCase() : '';
+        const st = leg.straight || leg;
+        const teamObj = st.team || {};
+        const playerObj = st.player;
+        const marketObj = st.market || {};
+        const lineVal = st.line ?? leg.line ?? 0.5;
+        const outcomeVal = (st.outcome || leg.outcome || 'over').toUpperCase();
+
+        const legLogo = getTeamLogoUrl(teamObj.code, teamObj.name);
+        const legName = playerObj ? (playerObj.preferredName || playerObj.fullName || playerObj.lastName) : (teamObj.code || teamObj.name || '');
+        const legMarket = getMarketNameES(marketObj.name);
         return `
           <div class="flex items-center gap-1.5 text-[11px] text-on-surface truncate py-0.5">
             <img src="${legLogo}" data-team-code="${leg.team?.code || ''}" class="w-4 h-4 rounded-full object-contain shrink-0" onerror="this.onerror=null; this.src='${defaultLogo}'">

@@ -1572,9 +1572,9 @@ function renderTrendsList() {
         const legMarket = getMarketNameES(marketObj.name);
         return `
           <div class="flex items-center gap-1.5 text-[11px] text-on-surface truncate py-0.5">
-            <img src="${legLogo}" data-team-code="${leg.team?.code || ''}" class="w-4 h-4 rounded-full object-contain shrink-0" onerror="this.onerror=null; this.src='${defaultLogo}'">
+            <img src="${legLogo}" data-team-code="${teamObj.code || ''}" class="w-4 h-4 rounded-full object-contain shrink-0" onerror="this.onerror=null; this.src='${defaultLogo}'">
             <span class="font-bold text-white shrink-0">${legName}:</span>
-            <span class="text-on-surface-variant truncate">${legDir} ${leg.line} ${legMarket}</span>
+            <span class="text-on-surface-variant truncate">${outcomeVal} ${lineVal} ${legMarket}</span>
           </div>
         `;
       }).join('') : '';

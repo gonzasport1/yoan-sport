@@ -1,0 +1,2397 @@
+import React, { useState, useEffect, useMemo } from "react";
+import { Eye, EyeOff, LogOut, ArrowLeft, ArrowRight, X, Trash2, CheckCircle2, Ticket, History, Landmark, Zap, ShieldCheck, Settings, Plus, Edit3, Check, RefreshCw } from "lucide-react";
+import { mergeGamesWithAdminOverrides, fetchLiveGamesFromAPI } from "./apiService";
+import { supabase } from "./supabaseClient";
+
+
+// ---------- Sport icon glyphs (custom, no trademarked logos) ----------
+function GloveIcon({ className }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="ufcGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FF416C" />
+          <stop offset="100%" stopColor="#FF4B2B" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#ufcGlow)" fillOpacity="0.1" stroke="url(#ufcGlow)" strokeWidth="1.5" />
+      <path
+        d="M20 36V22c0-2.2 1.8-4 4-4s4 1.8 4 4v10M28 32V20c0-2.2 1.8-4 4-4s4 1.8 4 4v8M36 32V22c0-2.2 1.8-4 4-4s4 1.8 4 4v10M44 34v-8c0-2.2 1.8-4 4-4s4 1.8 4 4v16c0 6.6-5.4 12-12 12H30c-5.5 0-10-4.5-10-10v-4"
+        stroke="url(#ufcGlow)"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <rect x="24" y="44" width="16" height="6" rx="2" fill="url(#ufcGlow)" />
+    </svg>
+  );
+}
+
+function BaseballIcon({ className }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="baseballGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#E8C34A" />
+          <stop offset="100%" stopColor="#C9A227" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#baseballGlow)" fillOpacity="0.1" stroke="url(#baseballGlow)" strokeWidth="1.5" />
+      <circle cx="32" cy="32" r="18" stroke="url(#baseballGlow)" strokeWidth="3.2" />
+      <path
+        d="M20 20c4.5 4.5 4.5 19.5 0 24M44 20c-4.5 4.5-4.5 19.5 0 24"
+        stroke="#FF4B2B"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeDasharray="2 3"
+      />
+    </svg>
+  );
+}
+
+function BallIcon({ className }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="futbolGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#2D97F7" />
+          <stop offset="100%" stopColor="#0667C2" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#futbolGlow)" fillOpacity="0.1" stroke="url(#futbolGlow)" strokeWidth="1.5" />
+      <circle cx="32" cy="32" r="18" stroke="url(#futbolGlow)" strokeWidth="3.2" />
+      <path
+        d="M32 22l5.5 4-2 6.5h-7l-2-6.5 5.5-4zM32 22v-8M37.5 26l6.5-2M26.5 26l-6.5-2M28.5 32.5L24 38.5M35.5 32.5l4.5 6M24 38.5h16"
+        stroke="url(#futbolGlow)"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function BasketballIcon({ className }) {
+  return (
+    <svg viewBox="0 0 64 64" className={className} fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="nbaGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#FF7B00" />
+          <stop offset="100%" stopColor="#FFA600" />
+        </linearGradient>
+      </defs>
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#nbaGlow)" fillOpacity="0.1" stroke="url(#nbaGlow)" strokeWidth="1.5" />
+      <circle cx="32" cy="32" r="18" stroke="url(#nbaGlow)" strokeWidth="3.2" />
+      <path
+        d="M32 14v36M14 32h36M20 20c5.5 5.5 5.5 18.5 0 24M44 20c-5.5 5.5-5.5 18.5 0 24"
+        stroke="url(#nbaGlow)"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+const SPORTS = [
+  {
+    id: "ufc",
+    name: "UFC / MMA",
+    tag: "Peleas & líneas de método",
+    Icon: GloveIcon,
+  },
+  {
+    id: "baseball",
+    name: "Béisbol",
+    tag: "Props, NRFI & totales",
+    Icon: BaseballIcon,
+  },
+  {
+    id: "futbol",
+    name: "Fútbol",
+    tag: "BTTS, over 2.5 & 1x2",
+    Icon: BallIcon,
+  },
+  {
+    id: "nba",
+    name: "NBA",
+    tag: "Moneyline, Hándicaps & Over/Under",
+    Icon: BasketballIcon,
+  },
+];
+
+// ---------- Mock Matches Data (Initial State) ----------
+const MOCK_GAMES = [
+  // --- FÚTBOL ---
+  {
+    id: "f-1",
+    sportId: "futbol",
+    homeTeam: "Real Madrid",
+    awayTeam: "Barcelona",
+    status: "live",
+    score: "2 - 1",
+    time: "74'",
+    date: "En Directo",
+    markets: [
+      {
+        name: "Resultado Final (1X2)",
+        options: [
+          { selection: "Real Madrid (1)", odd: 1.45 },
+          { selection: "Empate (X)", odd: 4.20 },
+          { selection: "Barcelona (2)", odd: 6.50 }
+        ]
+      },
+      {
+        name: "Ambos Equipos Anotan",
+        options: [
+          { selection: "Sí", odd: 1.69 },
+          { selection: "No", odd: 2.10 }
+        ]
+      },
+      {
+        name: "Total Goles (Más/Menos 3.5)",
+        options: [
+          { selection: "Más de 3.5", odd: 1.80 },
+          { selection: "Menos de 3.5", odd: 1.95 }
+        ]
+      }
+    ]
+  },
+  {
+    id: "f-2",
+    sportId: "futbol",
+    homeTeam: "Manchester City",
+    awayTeam: "Arsenal",
+    status: "scheduled",
+    time: "Mañana",
+    date: "10 de Julio, 15:00",
+    markets: [
+      {
+        name: "Resultado Final (1X2)",
+        options: [
+          { selection: "Man. City (1)", odd: 1.90 },
+          { selection: "Empate (X)", odd: 3.60 },
+          { selection: "Arsenal (2)", odd: 3.80 }
+        ]
+      },
+      {
+        name: "Ambos Equipos Anotan",
+        options: [
+          { selection: "Sí", odd: 1.57 },
+          { selection: "No", odd: 2.25 }
+        ]
+      }
+    ]
+  },
+  // --- NBA ---
+  {
+    id: "nba-1",
+    sportId: "nba",
+    homeTeam: "LA Lakers",
+    awayTeam: "Boston Celtics",
+    status: "live",
+    score: "102 - 99",
+    time: "4Q 5:12",
+    date: "En Directo",
+    markets: [
+      {
+        name: "Ganador del Partido (Moneyline)",
+        options: [
+          { selection: "LA Lakers", odd: 1.55 },
+          { selection: "Boston Celtics", odd: 2.45 }
+        ]
+      },
+      {
+        name: "Hándicap de Puntos",
+        options: [
+          { selection: "Lakers -4.5", odd: 1.90 },
+          { selection: "Celtics +4.5", odd: 1.90 }
+        ]
+      },
+      {
+        name: "Puntos Totales (Más/Menos 215.5)",
+        options: [
+          { selection: "Más de 215.5", odd: 1.85 },
+          { selection: "Menos de 215.5", odd: 1.95 }
+        ]
+      }
+    ]
+  },
+  {
+    id: "nba-2",
+    sportId: "nba",
+    homeTeam: "Golden State Warriors",
+    awayTeam: "Miami Heat",
+    status: "scheduled",
+    time: "Hoy",
+    date: "10 de Julio, 22:30",
+    markets: [
+      {
+        name: "Ganador del Partido (Moneyline)",
+        options: [
+          { selection: "G. S. Warriors", odd: 1.40 },
+          { selection: "Miami Heat", odd: 3.00 }
+        ]
+      },
+      {
+        name: "Hándicap de Puntos",
+        options: [
+          { selection: "Warriors -6.5", odd: 1.90 },
+          { selection: "Heat +6.5", odd: 1.90 }
+        ]
+      }
+    ]
+  },
+  // --- UFC ---
+  {
+    id: "ufc-1",
+    sportId: "ufc",
+    homeTeam: "Jon Jones",
+    awayTeam: "Stipe Miocic",
+    status: "live",
+    score: "Ronda 3",
+    time: "2:15",
+    date: "En Directo",
+    markets: [
+      {
+        name: "Ganador del Combate",
+        options: [
+          { selection: "Jon Jones", odd: 1.20 },
+          { selection: "Stipe Miocic", odd: 4.50 }
+        ]
+      },
+      {
+        name: "Método de Victoria",
+        options: [
+          { selection: "KO/TKO/Descalificación", odd: 2.10 },
+          { selection: "Sumisión", odd: 3.50 },
+          { selection: "Decisión", odd: 2.80 }
+        ]
+      }
+    ]
+  },
+  {
+    id: "ufc-2",
+    sportId: "ufc",
+    homeTeam: "Alex Pereira",
+    awayTeam: "Magomed Ankalaev",
+    status: "scheduled",
+    time: "Sábado",
+    date: "12 de Julio, 23:00",
+    markets: [
+      {
+        name: "Ganador del Combate",
+        options: [
+          { selection: "Alex Pereira", odd: 1.75 },
+          { selection: "Magomed Ankalaev", odd: 2.10 }
+        ]
+      }
+    ]
+  },
+  // --- BÉISBOL ---
+  {
+    id: "b-1",
+    sportId: "baseball",
+    homeTeam: "New York Yankees",
+    awayTeam: "Boston Red Sox",
+    status: "live",
+    score: "4 - 3",
+    time: "7° Inning",
+    date: "En Directo",
+    markets: [
+      {
+        name: "Ganador del Encuentro",
+        options: [
+          { selection: "NY Yankees", odd: 1.30 },
+          { selection: "Boston Red Sox", odd: 3.50 }
+        ]
+      },
+      {
+        name: "NRFI (Carrera en 1ª Entrada)",
+        options: [
+          { selection: "NRFI (Sí)", odd: 1.80 },
+          { selection: "NRFI (No)", odd: 1.95 }
+        ]
+      }
+    ]
+  },
+  {
+    id: "b-2",
+    sportId: "baseball",
+    homeTeam: "Los Angeles Dodgers",
+    awayTeam: "San Francisco Giants",
+    status: "scheduled",
+    time: "Mañana",
+    date: "11 de Julio, 19:10",
+    markets: [
+      {
+        name: "Ganador del Encuentro",
+        options: [
+          { selection: "LA Dodgers", odd: 1.50 },
+          { selection: "SF Giants", odd: 2.60 }
+        ]
+      }
+    ]
+  }
+];
+
+const ADMIN_EMAILS = ["admin@linea.com", "garciayoan2002@gmail.com"];
+function checkIsAdmin(emailStr) {
+  return emailStr && ADMIN_EMAILS.includes(emailStr.toLowerCase().trim());
+}
+
+export default function App() {
+  // Pre-seed admin account
+  const [users, setUsers] = useState(() => {
+    const saved = localStorage.getItem("linea_users");
+    const initial = saved ? JSON.parse(saved) : {};
+    return { 
+      ...initial, 
+      "admin@linea.com": "admin123",
+      "garciayoan2002@gmail.com": "admin123" 
+    };
+  });
+  
+  const [session, setSession] = useState(null); // logged-in email
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [viewMode, setViewMode] = useState("client"); // 'client' | 'admin'
+  const [mode, setMode] = useState("login"); // 'login' | 'register'
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
+  const [error, setError] = useState("");
+  const [loadingAuth, setLoadingAuth] = useState(false);
+
+  // Sync session with Supabase
+  useEffect(() => {
+    if (!supabase) return;
+
+    // Check active session on mount
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setSession(session.user.email);
+        const isUserAdmin = checkIsAdmin(session.user.email);
+        setIsAdmin(isUserAdmin);
+        setViewMode(isUserAdmin ? "admin" : "client");
+      }
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setSession(session.user.email);
+        const isUserAdmin = checkIsAdmin(session.user.email);
+        setIsAdmin(isUserAdmin);
+        setViewMode(isUserAdmin ? "admin" : "client");
+      } else {
+        setSession(null);
+        setIsAdmin(false);
+        setViewMode("client");
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Load administrative overrides from Supabase database
+  useEffect(() => {
+    if (!supabase) return;
+
+    async function loadFromSupabase() {
+      try {
+        // Load admin custom games
+        const { data: dbGames, error: gError } = await supabase
+          .from("admin_games")
+          .select("*");
+        
+        if (!gError && dbGames) {
+          const mapped = dbGames.map((g) => ({
+            id: g.id,
+            sportId: g.sport_id,
+            homeTeam: g.home_team,
+            awayTeam: g.away_team,
+            status: g.status,
+            score: g.score || undefined,
+            time: g.time || undefined,
+            date: g.date,
+            markets: g.markets
+          }));
+          setAdminGames(mapped);
+        }
+
+        // Load overridden odds
+        const { data: dbOdds, error: oError } = await supabase
+          .from("overridden_odds")
+          .select("*");
+        
+        if (!oError && dbOdds) {
+          const mappedOdds = {};
+          dbOdds.forEach((item) => {
+            mappedOdds[item.key] = item.odd;
+          });
+          setOverriddenOdds(mappedOdds);
+        }
+
+        // Load deleted games list
+        const { data: dbDeleted, error: dError } = await supabase
+          .from("deleted_game_ids")
+          .select("*");
+        
+        if (!dError && dbDeleted) {
+          setDeletedGameIds(dbDeleted.map((item) => item.id));
+        }
+      } catch (err) {
+        console.error("Error loading overrides from Supabase:", err);
+      }
+    }
+
+    loadFromSupabase();
+  }, [session]);
+
+  // Live API Games States
+  const [apiGames, setApiGames] = useState([]);
+  const [loadingApi, setLoadingApi] = useState(false);
+
+  // Persisted Administrator overrides & custom games
+  const [adminGames, setAdminGames] = useState(() => {
+    const saved = localStorage.getItem("linea_admin_games");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [overriddenOdds, setOverriddenOdds] = useState(() => {
+    const saved = localStorage.getItem("linea_overridden_odds");
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  const [deletedGameIds, setDeletedGameIds] = useState(() => {
+    const saved = localStorage.getItem("linea_deleted_game_ids");
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Poll real-time API-Sports data
+  useEffect(() => {
+    if (!session) return;
+    let isMounted = true;
+    
+    async function loadGames() {
+      setLoadingApi(true);
+      const data = await fetchLiveGamesFromAPI();
+      if (isMounted) {
+        setApiGames(data);
+        setLoadingApi(false);
+      }
+    }
+
+    loadGames();
+    const interval = setInterval(async () => {
+      const data = await fetchLiveGamesFromAPI();
+      if (isMounted) {
+        setApiGames(data);
+      }
+    }, 30000); // Poll every 30 seconds
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [session]);
+
+  // Compile final active games
+  const games = useMemo(() => {
+    const baseGames = [...apiGames, ...MOCK_GAMES];
+    const allBase = mergeGamesWithAdminOverrides(baseGames, adminGames, overriddenOdds);
+    return allBase.filter((g) => !deletedGameIds.includes(g.id));
+  }, [apiGames, adminGames, overriddenOdds, deletedGameIds]);
+
+  // Client States
+  const [selectedSport, setSelectedSport] = useState(null);
+  const [balance, setBalance] = useState(() => {
+    const saved = localStorage.getItem("linea_balance");
+    return saved ? parseFloat(saved) : 1000.00;
+  });
+  const [betslip, setBetslip] = useState(() => {
+    const saved = localStorage.getItem("linea_betslip");
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [placedBets, setPlacedBets] = useState(() => {
+    const saved = localStorage.getItem("linea_placed_bets");
+    return saved ? JSON.parse(saved) : [];
+  });
+  
+  const [showMyBets, setShowMyBets] = useState(false);
+  const [selectedGame, setSelectedGame] = useState(null);
+  const [activeTab, setActiveTab] = useState("live");
+  const [betSuccess, setBetSuccess] = useState(false);
+  const [showBetslipDrawer, setShowBetslipDrawer] = useState(false);
+  const [betslipAlert, setBetslipAlert] = useState(false);
+
+  // Sync state to LocalStorage
+  useEffect(() => {
+    localStorage.setItem("linea_users", JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem("linea_admin_games", JSON.stringify(adminGames));
+  }, [adminGames]);
+
+  useEffect(() => {
+    localStorage.setItem("linea_overridden_odds", JSON.stringify(overriddenOdds));
+  }, [overriddenOdds]);
+
+  useEffect(() => {
+    localStorage.setItem("linea_deleted_game_ids", JSON.stringify(deletedGameIds));
+  }, [deletedGameIds]);
+
+  useEffect(() => {
+    localStorage.setItem("linea_balance", balance.toString());
+  }, [balance]);
+
+  useEffect(() => {
+    localStorage.setItem("linea_betslip", JSON.stringify(betslip));
+  }, [betslip]);
+
+  useEffect(() => {
+    localStorage.setItem("linea_placed_bets", JSON.stringify(placedBets));
+  }, [placedBets]);
+
+  // Real-time Sync of Betslip odds when Admin changes them
+  useEffect(() => {
+    if (betslip.length === 0) return;
+    let changed = false;
+    const updatedBetslip = betslip.map((item) => {
+      // Find the game in current active games list
+      const game = games.find((g) => g.id === item.gameId);
+      if (!game) return item;
+      
+      const market = game.markets.find((m) => m.name === item.marketName);
+      if (!market) return item;
+
+      const option = market.options.find((o) => o.selection === item.selectionName);
+      if (!option) return item;
+
+      if (option.odd !== item.odd) {
+        changed = true;
+        return { ...item, odd: option.odd };
+      }
+      return item;
+    });
+
+    if (changed) {
+      setBetslip(updatedBetslip);
+      setBetslipAlert(true);
+      const timer = setTimeout(() => setBetslipAlert(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [games, betslip]);
+
+  function resetForm() {
+    setEmail("");
+    setPassword("");
+    setError("");
+    setShowPw(false);
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError("");
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail || !password) {
+      setError("Completá email y contraseña.");
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(cleanEmail)) {
+      setError("Ese email no parece válido.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("La contraseña necesita al menos 6 caracteres.");
+      return;
+    }
+
+    const runLocalFallback = () => {
+      if (mode === "register") {
+        if (users[cleanEmail]) {
+          setError("Ya existe una cuenta con ese email. Iniciá sesión.");
+          return;
+        }
+        setUsers((u) => ({ ...u, [cleanEmail]: password }));
+        setSession(cleanEmail);
+        const isUserAdmin = checkIsAdmin(cleanEmail);
+        setIsAdmin(isUserAdmin);
+        setViewMode(isUserAdmin ? "admin" : "client");
+        resetForm();
+      } else {
+        if (!users[cleanEmail] || users[cleanEmail] !== password) {
+          setError("Email o contraseña incorrectos.");
+          return;
+        }
+        setSession(cleanEmail);
+        const isUserAdmin = checkIsAdmin(cleanEmail);
+        setIsAdmin(isUserAdmin);
+        setViewMode(isUserAdmin ? "admin" : "client");
+        resetForm();
+      }
+    };
+
+    if (!supabase) {
+      runLocalFallback();
+      return;
+    }
+
+    // Real Supabase Auth
+    setLoadingAuth(true);
+    try {
+      if (mode === "register") {
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password: password,
+        });
+        setLoadingAuth(false);
+        if (signUpError) {
+          if (signUpError.message && (signUpError.message.includes("fetch") || signUpError.status === 0 || signUpError.message.includes("Failed to fetch") || signUpError.message.includes("network"))) {
+            console.log("Supabase unreachable. Falling back to local storage auth.");
+            runLocalFallback();
+          } else {
+            setError(signUpError.message);
+          }
+        } else {
+          if (signUpData?.session) {
+            setSession(signUpData.session.user.email);
+            const isUserAdmin = checkIsAdmin(signUpData.session.user.email);
+            setIsAdmin(isUserAdmin);
+            setViewMode(isUserAdmin ? "admin" : "client");
+            resetForm();
+          } else {
+            setError("¡Cuenta creada! Verifica tu correo electrónico si has recibido un enlace de confirmación.");
+          }
+        }
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password,
+        });
+        setLoadingAuth(false);
+        if (signInError) {
+          if (signInError.message && (signInError.message.includes("fetch") || signInError.status === 0 || signInError.message.includes("Failed to fetch") || signInError.message.includes("network"))) {
+            console.log("Supabase unreachable. Falling back to local storage auth.");
+            runLocalFallback();
+          } else {
+            setError("Email o contraseña incorrectos (o cuenta no verificada).");
+          }
+        } else {
+          resetForm();
+        }
+      }
+    } catch (err) {
+      setLoadingAuth(false);
+      console.log("Supabase error. Falling back to local storage auth:", err);
+      runLocalFallback();
+    }
+  }
+
+  async function handleLogout() {
+    if (supabase) {
+      try {
+        await supabase.auth.signOut();
+      } catch (err) {
+        console.warn("Supabase signOut error (likely offline):", err);
+      }
+    }
+    setSession(null);
+    setIsAdmin(false);
+    setViewMode("client");
+    setSelectedSport(null);
+    setShowMyBets(false);
+    setSelectedGame(null);
+    resetForm();
+  }
+
+  // Handle odds selection
+  function toggleSelection(game, market, selection, odd) {
+    const selectionId = `${game.id}-${market.name}-${selection}`;
+    const exists = betslip.find((item) => item.id === selectionId);
+
+    if (exists) {
+      setBetslip((prev) => prev.filter((item) => item.id !== selectionId));
+    } else {
+      setBetslip((prev) => {
+        const filtered = prev.filter(
+          (item) => !(item.gameId === game.id && item.marketName === market.name)
+        );
+        return [
+          ...filtered,
+          {
+            id: selectionId,
+            gameId: game.id,
+            gameName: `${game.homeTeam} vs ${game.awayTeam}`,
+            marketName: market.name,
+            selectionName: selection,
+            odd: odd,
+          }
+        ];
+      });
+      setShowBetslipDrawer(true);
+    }
+  }
+
+  // Place bet
+  function handlePlaceBet(stake, isParlay = false) {
+    const numericStake = parseFloat(stake);
+    if (isNaN(numericStake) || numericStake <= 0) return "Ingresa un monto válido.";
+    if (numericStake > balance) return "Saldo insuficiente.";
+
+    if (isParlay) {
+      const totalOdd = parseFloat(betslip.reduce((acc, curr) => acc * curr.odd, 1).toFixed(2));
+      const newBet = {
+        id: "bet-" + Date.now(),
+        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: "Combinada (" + betslip.length + " selecciones)",
+        stake: numericStake,
+        odds: totalOdd,
+        payout: parseFloat((numericStake * totalOdd).toFixed(2)),
+        status: "active",
+        selections: [...betslip]
+      };
+      setPlacedBets((prev) => [newBet, ...prev]);
+      setBalance((b) => parseFloat((b - numericStake).toFixed(2)));
+    } else {
+      if (balance < numericStake * betslip.length) return "Saldo insuficiente para todas las apuestas.";
+      
+      const newBets = betslip.map((item, idx) => ({
+        id: `bet-${Date.now()}-${idx}`,
+        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        type: "Simple",
+        stake: numericStake,
+        odds: item.odd,
+        payout: parseFloat((numericStake * item.odd).toFixed(2)),
+        status: "active",
+        selections: [item]
+      }));
+
+      setPlacedBets((prev) => [...newBets, ...prev]);
+      setBalance((b) => parseFloat((b - (numericStake * betslip.length)).toFixed(2)));
+    }
+
+    setBetslip([]);
+    setBetSuccess(true);
+    setTimeout(() => setBetSuccess(false), 3000);
+    return null;
+  }
+
+  // Settle active bets
+  function resolveBet(betId, outcome) {
+    setPlacedBets((prev) =>
+      prev.map((bet) => {
+        if (bet.id === betId && bet.status === "active") {
+          if (outcome === "won") {
+            setBalance((b) => parseFloat((b + bet.payout).toFixed(2)));
+            return { ...bet, status: "won" };
+          } else {
+            return { ...bet, status: "lost" };
+          }
+        }
+        return bet;
+      })
+    );
+  }
+
+  function getLiveCount(sportId) {
+    return games.filter((g) => g.sportId === sportId && g.status === "live").length;
+  }
+
+  return (
+    <div className="min-h-screen w-full bg-[#050709] text-[#F2F0EA] font-sans relative overflow-hidden flex flex-col bg-dashboard">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+        .font-display { font-family: 'Bebas Neue', sans-serif; letter-spacing: 0.04em; }
+        .font-sans { font-family: 'Inter', sans-serif; }
+        @keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        .ticker-track { animation: ticker 28s linear infinite; }
+        .glow-border { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        .glow-border:hover { 
+          box-shadow: 0 0 0 1px rgba(232,195,74,0.15), 0 20px 40px -15px rgba(232,195,74,0.1);
+          border-color: rgba(232,195,74,0.3) !important;
+        }
+        .bg-dashboard {
+          background: radial-gradient(circle at 50% 0%, rgba(232, 195, 74, 0.04) 0%, rgba(5, 7, 9, 0) 70%),
+                      radial-gradient(circle at 100% 100%, rgba(24, 28, 36, 0.3) 0%, rgba(5, 7, 9, 0) 60%),
+                      #050709;
+        }
+      `}</style>
+
+      {/* ambient background glows */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 w-[800px] h-[500px] rounded-full bg-[#E8C34A] opacity-[0.06] blur-[120px]" />
+      <div className="pointer-events-none absolute bottom-[-100px] right-[-100px] w-[500px] h-[500px] rounded-full bg-[#2D97F7] opacity-[0.03] blur-[150px]" />
+      <div className="pointer-events-none absolute top-[40%] left-[-200px] w-[600px] h-[600px] rounded-full bg-[#FF416C] opacity-[0.02] blur-[150px]" />
+
+      {/* ticker */}
+      <div className="relative border-b border-white/5 bg-black/40 overflow-hidden whitespace-nowrap py-1.5 z-20">
+        <div className="ticker-track inline-block">
+          {Array(2)
+            .fill(
+              "NBA · APUESTAS EN VIVO Y DIRECTO — UFC · MÉTODO DE VICTORIA  —  MLB · NRFI & PROPS  —  FÚTBOL · BTTS & OVER 2.5  —  ANÁLISIS ACTUALIZADO A DIARIO  —  "
+            )
+            .map((t, i) => (
+              <span key={i} className="text-[11px] tracking-[0.2em] text-[#8B93A1] px-4 uppercase font-semibold">
+                {t}
+              </span>
+            ))}
+        </div>
+      </div>
+
+      {!session ? (
+        <div className="flex-1 flex items-center justify-center">
+          <AuthScreen
+            mode={mode}
+            setMode={setMode}
+            email={email}
+            setEmail={setEmail}
+            password={password}
+            setPassword={setPassword}
+            showPw={showPw}
+            setShowPw={setShowPw}
+            error={error}
+            handleSubmit={handleSubmit}
+            loading={loadingAuth}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col">
+          {/* Main Dashboard Header */}
+          <header className="border-b border-white/5 bg-[#0E1116] py-4 px-6 relative z-30">
+            <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+              <div>
+                <h1 className="font-display text-4xl text-[#E8C34A] tracking-wider leading-none">LÍNEA</h1>
+                <p className="text-[#8B93A1] text-xs mt-0.5">{session}</p>
+              </div>
+
+              {/* Wallet, Admin switch & Active Bets */}
+              <div className="flex items-center gap-3">
+                {isAdmin && (
+                  <div className="flex rounded-xl bg-black/40 p-1 border border-white/5 mr-2">
+                    <button
+                      onClick={() => setViewMode("client")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        viewMode === "client" ? "bg-[#E8C34A] text-black" : "text-[#8B93A1] hover:text-white"
+                      }`}
+                    >
+                      Vista Cliente
+                    </button>
+                    <button
+                      onClick={() => setViewMode("admin")}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        viewMode === "admin" ? "bg-[#E8C34A] text-black" : "text-[#8B93A1] hover:text-white"
+                      }`}
+                    >
+                      <Settings size={12} />
+                      Admin Panel
+                    </button>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2">
+                  <Landmark size={15} className="text-[#E8C34A]" />
+                  <div className="text-right">
+                    <p className="text-[10px] text-[#8B93A1] uppercase tracking-wider">Saldo Virtual</p>
+                    <p className="text-sm font-bold text-white">${balance.toFixed(2)}</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setShowMyBets(true)}
+                  className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 text-xs border border-white/10 rounded-xl px-3.5 py-2.5 transition-colors font-medium relative"
+                >
+                  <History size={15} />
+                  <span>Mis Apuestas</span>
+                  {placedBets.filter(b => b.status === 'active').length > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-[#E8C34A] text-black font-bold text-[9px] w-4 h-4 rounded-full flex items-center justify-center animate-bounce">
+                      {placedBets.filter(b => b.status === 'active').length}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-1.5 text-xs text-[#8B93A1] hover:text-white border border-white/10 hover:border-white/20 rounded-xl px-3 py-2.5 transition-colors"
+                >
+                  <LogOut size={14} />
+                  <span className="hidden sm:inline">Salir</span>
+                </button>
+              </div>
+            </div>
+          </header>
+
+          <main className="flex-1 max-w-6xl w-full mx-auto px-4 py-8 flex flex-col md:flex-row gap-6 relative z-10">
+            {viewMode === "admin" ? (
+              <AdminPanel
+                games={games}
+                adminGames={adminGames}
+                setAdminGames={setAdminGames}
+                overriddenOdds={overriddenOdds}
+                setOverriddenOdds={setOverriddenOdds}
+                deletedGameIds={deletedGameIds}
+                setDeletedGameIds={setDeletedGameIds}
+              />
+            ) : (
+              <>
+                {/* Client Main Area */}
+                <div className="flex-1">
+                  {!selectedSport ? (
+                    <>
+                      <p className="text-[#8B93A1] text-xs uppercase tracking-[0.2em] mb-6 font-semibold">Seleccioná un deporte para apostar</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {SPORTS.map(({ id, name, tag, Icon }) => {
+                          const liveCount = getLiveCount(id);
+                          return (
+                            <button
+                              key={id}
+                              onClick={() => setSelectedSport(id)}
+                              className="glow-border group text-left bg-gradient-to-b from-[#13161C] to-[#0B0D12] border border-white/10 rounded-[24px] p-6 transition-all hover:-translate-y-1.5 relative overflow-hidden shadow-[0_12px_24px_-10px_rgba(0,0,0,0.6)] hover:shadow-[0_20px_40px_-15px_rgba(232,195,74,0.15)]"
+                            >
+                              {/* Background radial gradient glow for each sport */}
+                              <div className="absolute -right-10 -bottom-10 w-32 h-32 rounded-full opacity-[0.02] group-hover:opacity-[0.06] transition-opacity blur-2xl bg-white" />
+                              
+                              <div className="mb-6 flex items-center justify-between">
+                                <Icon className="w-14 h-14 transition-transform group-hover:scale-110 duration-300" />
+                                {liveCount > 0 && (
+                                  <span className="bg-red-500/10 border border-red-500/30 text-red-400 text-[9px] px-2.5 py-1 rounded-full font-bold flex items-center gap-1.5 uppercase tracking-wider">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                    {liveCount} En Vivo
+                                  </span>
+                                )}
+                              </div>
+
+                              <h3 className="font-display text-3xl text-white tracking-wide group-hover:text-[#E8C34A] transition-colors">{name}</h3>
+                              <p className="text-[#8B93A1] text-[11px] mt-1.5 leading-relaxed font-medium min-h-[34px]">{tag}</p>
+
+                              <div className="mt-6 pt-4 border-t border-white/5 flex items-center gap-1.5 text-[#E8C34A] text-xs font-bold uppercase tracking-wider group-hover:gap-2.5 transition-all">
+                                <span>Ver partidos</span>
+                                <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Instructions */}
+                      <div className="mt-12 p-6 bg-gradient-to-r from-[#13161C] to-[#0B0D12] border border-white/5 rounded-2xl flex items-start gap-4">
+                        <ShieldCheck className="text-[#E8C34A] shrink-0 mt-0.5" size={24} />
+                        <div>
+                          <h4 className="text-white text-sm font-semibold mb-1">Simulación de Apuestas Deportivas</h4>
+                          <p className="text-[#8B93A1] text-xs leading-relaxed">
+                            Esta interfaz permite elegir partidos programados o en directo. Inicia sesión con tu correo administrador <strong>garciayoan2002@gmail.com</strong> para acceder al Panel de Control de Administrador, donde podrás alterar las cuotas, marcadores y crear partidos a tu antojo.
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <SportDetailsView
+                      sportId={selectedSport}
+                      games={games}
+                      onBack={() => setSelectedSport(null)}
+                      betslip={betslip}
+                      toggleSelection={toggleSelection}
+                      activeTab={activeTab}
+                      setActiveTab={setActiveTab}
+                      onOpenDetails={(game) => setSelectedGame(game)}
+                    />
+                  )}
+                </div>
+
+                {/* Right Panel / Desktop Betslip */}
+                <div className="w-full md:w-80 shrink-0">
+                  <div className="sticky top-6">
+                    <DesktopBetslip
+                      betslip={betslip}
+                      balance={balance}
+                      onRemove={(item) => setBetslip((prev) => prev.filter((i) => i.id !== item.id))}
+                      onClear={() => setBetslip([])}
+                      onPlaceBet={handlePlaceBet}
+                      success={betSuccess}
+                      alert={betslipAlert}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+          </main>
+        </div>
+      )}
+
+      {/* Betslip Toggle Button for Mobile */}
+      {session && betslip.length > 0 && viewMode === "client" && (
+        <div className="md:hidden fixed bottom-6 right-6 z-40">
+          <button
+            onClick={() => setShowBetslipDrawer(true)}
+            className="bg-[#E8C34A] text-black font-bold p-4 rounded-full shadow-lg flex items-center justify-center relative animate-pulse"
+          >
+            <Ticket size={24} />
+            <span className="absolute -top-2 -right-2 bg-red-500 text-white font-bold text-xs w-6 h-6 rounded-full flex items-center justify-center border-2 border-[#0A0C0F]">
+              {betslip.length}
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* Detailed Game Markets Modal */}
+      {selectedGame && (
+        <GameMarketsModal
+          game={selectedGame}
+          betslip={betslip}
+          toggleSelection={toggleSelection}
+          onClose={() => setSelectedGame(null)}
+        />
+      )}
+
+      {/* Mis Apuestas Drawer */}
+      {showMyBets && (
+        <MyBetsDrawer
+          placedBets={placedBets}
+          onClose={() => setShowMyBets(false)}
+          onResolve={resolveBet}
+        />
+      )}
+
+      {/* Mobile Betslip Drawer */}
+      {showBetslipDrawer && (
+        <MobileBetslipDrawer
+          betslip={betslip}
+          balance={balance}
+          onRemove={(item) => setBetslip((prev) => prev.filter((i) => i.id !== item.id))}
+          onClear={() => setBetslip([])}
+          onPlaceBet={handlePlaceBet}
+          onClose={() => setShowBetslipDrawer(false)}
+          success={betSuccess}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------- Component: Auth Screen ----------
+function AuthScreen({ mode, setMode, email, setEmail, password, setPassword, showPw, setShowPw, error, handleSubmit, loading }) {
+  const isRealAuth = !!supabase;
+  return (
+    <div className="w-full max-w-sm bg-[#12151A] border border-white/5 rounded-3xl p-8 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.8)] mx-4">
+      <div className="mb-6 text-center">
+        <h1 className="font-display text-6xl text-[#E8C34A] leading-none tracking-wider">LÍNEA</h1>
+        <p className="text-[#8B93A1] text-[10px] tracking-[0.3em] uppercase mt-2 font-bold">Picks &amp; apuestas deportivas</p>
+      </div>
+
+      <div className="mb-6 flex justify-center">
+        {isRealAuth ? (
+          <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] px-2.5 py-1 rounded-full font-bold flex items-center gap-1.5 uppercase tracking-wide">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Conectado a Supabase Auth
+          </span>
+        ) : (
+          <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[10px] px-2.5 py-1 rounded-full font-bold flex items-center gap-1.5 uppercase tracking-wide">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+            Modo Demo (Auth Local)
+          </span>
+        )}
+      </div>
+
+      <div className="flex mb-6 rounded-xl bg-[#0A0C0F] p-1 border border-white/5">
+        <button
+          onClick={() => setMode("login")}
+          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all uppercase tracking-wider ${
+            mode === "login" ? "bg-[#E8C34A] text-black" : "text-[#8B93A1] hover:text-white"
+          }`}
+        >
+          Iniciar sesión
+        </button>
+        <button
+          onClick={() => setMode("register")}
+          className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all uppercase tracking-wider ${
+            mode === "register" ? "bg-[#E8C34A] text-black" : "text-[#8B93A1] hover:text-white"
+          }`}
+        >
+          Crear cuenta
+        </button>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-[10px] text-[#8B93A1] mb-2 uppercase tracking-wider font-bold">Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="tuemail@ejemplo.com"
+            className="w-full bg-[#0A0C0F] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#E8C34A] transition-colors placeholder:text-[#4A5160] text-white"
+          />
+        </div>
+
+        <div>
+          <label className="block text-[10px] text-[#8B93A1] mb-2 uppercase tracking-wider font-bold">Contraseña</label>
+          <div className="relative">
+            <input
+              type={showPw ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Mínimo 6 caracteres"
+              className="w-full bg-[#0A0C0F] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#E8C34A] transition-colors placeholder:text-[#4A5160] pr-12 text-white"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw((s) => !s)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8B93A1] hover:text-white"
+            >
+              {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <p className="text-[#E07856] text-xs bg-[#E07856]/10 border border-[#E07856]/20 rounded-xl px-4 py-2.5">
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-[#E8C34A] hover:bg-[#F2D16B] disabled:opacity-50 text-black font-bold py-3.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2 uppercase tracking-wider mt-6 cursor-pointer disabled:cursor-not-allowed"
+        >
+          {loading ? (
+            <span className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <>
+              <span>{mode === "login" ? "Entrar" : "Crear cuenta"}</span>
+              <ArrowRight size={15} />
+            </>
+          )}
+        </button>
+      </form>
+
+      <p className="text-[#4A5160] text-[10px] mt-6 text-center leading-relaxed">
+        {isRealAuth ? (
+          <>
+            <strong>Autenticación Real:</strong> Los usuarios registrados se guardan en tu base de datos de Supabase.
+          </>
+        ) : (
+          <>
+            <strong>Modo Demo Activo:</strong> Usa <code>admin@linea.com</code> y <code>admin123</code> para ingresar. Agrega un archivo <code>.env</code> con <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code> para conectar tu proyecto real.
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
+
+// ---------- Component: Sport Details View ----------
+function SportDetailsView({ sportId, games, onBack, betslip, toggleSelection, activeTab, setActiveTab, onOpenDetails }) {
+  const sport = SPORTS.find((s) => s.id === sportId);
+  const filteredGames = games.filter((g) => g.sportId === sportId && g.status === activeTab);
+
+  return (
+    <div>
+      <button
+        onClick={onBack}
+        className="flex items-center gap-1.5 text-xs text-[#8B93A1] hover:text-white mb-6 transition-colors"
+      >
+        <ArrowLeft size={14} /> Volver a deportes
+      </button>
+
+      <div className="flex items-center gap-4 mb-8">
+        <div className="bg-[#12151A] border border-white/5 p-3 rounded-2xl">
+          <sport.Icon className="w-12 h-12 text-[#E8C34A]" />
+        </div>
+        <div>
+          <h2 className="font-display text-4xl text-white leading-none tracking-wide">{sport.name}</h2>
+          <p className="text-[#8B93A1] text-xs mt-1">{sport.tag}</p>
+        </div>
+      </div>
+
+      <div className="flex border-b border-white/5 mb-6">
+        <button
+          onClick={() => setActiveTab("live")}
+          className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 uppercase tracking-wider relative flex items-center gap-2 ${
+            activeTab === "live"
+              ? "border-[#E8C34A] text-white"
+              : "border-transparent text-[#8B93A1] hover:text-white"
+          }`}
+        >
+          {activeTab === "live" && <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />}
+          En Directo
+        </button>
+        <button
+          onClick={() => setActiveTab("scheduled")}
+          className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 uppercase tracking-wider ${
+            activeTab === "scheduled"
+              ? "border-[#E8C34A] text-white"
+              : "border-transparent text-[#8B93A1] hover:text-white"
+          }`}
+        >
+          Programados
+        </button>
+      </div>
+
+      {filteredGames.length === 0 ? (
+        <div className="bg-[#12151A] border border-white/5 rounded-2xl p-10 text-center">
+          <p className="text-[#8B93A1] text-sm">No hay partidos {activeTab === "live" ? "en vivo" : "programados"} para este deporte.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {filteredGames.map((game) => {
+            const mainMarket = game.markets[0];
+
+            return (
+              <div key={game.id} className="bg-[#12151A] border border-white/5 rounded-2xl p-5 hover:border-white/10 transition-all">
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    {game.status === "live" ? (
+                      <>
+                        <span className="bg-red-500/10 border border-red-500/30 text-red-500 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse" />
+                          EN VIVO
+                        </span>
+                        <span className="text-[#E8C34A] text-xs font-semibold">{game.time}</span>
+                      </>
+                    ) : (
+                      <span className="text-[#8B93A1] text-xs font-semibold">{game.date}</span>
+                    )}
+                    {game.isApi && (
+                      <span className="bg-[#E8C34A]/10 border border-[#E8C34A]/30 text-[#E8C34A] text-[9px] font-bold px-2 py-0.5 rounded-full">
+                        API-SPORTS
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[#8B93A1] text-[10px] uppercase font-bold tracking-wider">Línea Europea</span>
+                </div>
+
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <div className="flex-1 flex items-center justify-between gap-4">
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3">
+                        {game.homeLogo ? (
+                          <img src={game.homeLogo} alt={game.homeTeam} className="w-6 h-6 object-contain bg-white/10 p-0.5 rounded border border-white/10" />
+                        ) : (
+                          <div className="w-6 h-6 rounded bg-[#E8C34A]/10 border border-[#E8C34A]/25 text-[#E8C34A] flex items-center justify-center text-[9px] font-bold">
+                            {game.homeTeam ? game.homeTeam.substring(0, 2).toUpperCase() : "H"}
+                          </div>
+                        )}
+                        <p className="text-white text-base font-bold">{game.homeTeam}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {game.awayLogo ? (
+                          <img src={game.awayLogo} alt={game.awayTeam} className="w-6 h-6 object-contain bg-white/10 p-0.5 rounded border border-white/10" />
+                        ) : (
+                          <div className="w-6 h-6 rounded bg-[#E8C34A]/10 border border-[#E8C34A]/25 text-[#E8C34A] flex items-center justify-center text-[9px] font-bold">
+                            {game.awayTeam ? game.awayTeam.substring(0, 2).toUpperCase() : "A"}
+                          </div>
+                        )}
+                        <p className="text-white text-base font-bold">{game.awayTeam}</p>
+                      </div>
+                    </div>
+                    {game.status === "live" && (
+                      <div className="bg-black/40 border border-white/5 px-3.5 py-1.5 rounded-xl text-center min-w-[50px]">
+                        <p className="text-[#E8C34A] font-bold text-sm tracking-wider">{game.score}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {mainMarket && (
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      {mainMarket.options.map((opt) => {
+                        const isSelected = betslip.some(
+                          (item) => item.gameId === game.id && item.marketName === mainMarket.name && item.selectionName === opt.selection
+                        );
+                        return (
+                          <button
+                            key={opt.selection}
+                            onClick={() => toggleSelection(game, mainMarket, opt.selection, opt.odd)}
+                            className={`px-4 py-2.5 rounded-xl border text-xs font-bold transition-all min-w-[90px] text-center flex flex-col items-center justify-center gap-0.5 ${
+                              isSelected
+                                ? "bg-[#E8C34A] border-[#E8C34A] text-black"
+                                : "bg-[#0A0C0F] border-white/10 text-white hover:border-[#E8C34A]"
+                            }`}
+                          >
+                            <span className="text-[10px] opacity-75 font-medium truncate max-w-[80px]">{opt.selection}</span>
+                            <span className="text-sm">{opt.odd.toFixed(2)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-white/5 mt-4 pt-3 flex justify-between items-center">
+                  <span className="text-[10px] text-[#8B93A1] uppercase font-semibold">
+                    {game.markets.length} mercados disponibles
+                  </span>
+                  <button
+                    onClick={() => onOpenDetails(game)}
+                    className="text-[#E8C34A] hover:text-white text-xs font-bold flex items-center gap-1 transition-colors"
+                  >
+                    Ver todas las apuestas <ArrowRight size={13} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- Component: Desktop Betslip ----------
+function DesktopBetslip({ betslip, balance, onRemove, onClear, onPlaceBet, success, alert }) {
+  const [stake, setStake] = useState("");
+  const [betType, setBetType] = useState("simple");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setError("");
+  }, [betslip, betType, stake]);
+
+  const isParlayAllowed = betslip.length >= 2;
+  const currentBetType = isParlayAllowed && betType === "parlay" ? "parlay" : "simple";
+
+  const parlayOdds = parseFloat(betslip.reduce((acc, curr) => acc * curr.odd, 1).toFixed(2));
+  const numericStake = parseFloat(stake) || 0;
+  const potentialPayout = currentBetType === "parlay" 
+    ? (numericStake * parlayOdds) 
+    : (numericStake * betslip.reduce((acc, curr) => acc + curr.odd, 0));
+
+  function handlePlacement(e) {
+    e.preventDefault();
+    if (!stake) {
+      setError("Ingresa el monto.");
+      return;
+    }
+    const err = onPlaceBet(stake, currentBetType === "parlay");
+    if (err) {
+      setError(err);
+    } else {
+      setStake("");
+    }
+  }
+
+  return (
+    <div className="bg-[#12151A] border border-white/5 rounded-3xl p-5 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.6)]">
+      <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+        <div className="flex items-center gap-1.5">
+          <Ticket size={18} className="text-[#E8C34A]" />
+          <h3 className="font-display text-2xl text-white tracking-wide">Talonario</h3>
+        </div>
+        {betslip.length > 0 && (
+          <button
+            onClick={onClear}
+            className="text-[#8B93A1] hover:text-white text-xs flex items-center gap-1 transition-colors"
+          >
+            <Trash2 size={12} /> Limpiar
+          </button>
+        )}
+      </div>
+
+      {alert && (
+        <div className="bg-[#E8C34A]/10 border border-[#E8C34A]/30 rounded-xl p-3 mb-3 text-[#E8C34A] text-[10px] text-center font-semibold animate-pulse">
+          ⚠️ Las cuotas de tu talonario se han actualizado en tiempo real.
+        </div>
+      )}
+
+      {success && (
+        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-2xl p-4 mb-4 text-center text-emerald-400 flex flex-col items-center gap-2 animate-fadeIn">
+          <CheckCircle2 size={24} />
+          <div>
+            <p className="text-sm font-bold">¡Apuesta Colocada!</p>
+            <p className="text-[10px] opacity-75">Saldo actualizado.</p>
+          </div>
+        </div>
+      )}
+
+      {betslip.length === 0 ? (
+        <div className="py-8 text-center text-[#8B93A1] text-xs">
+          <p>Haz clic en cualquier cuota de partido para añadirla al talonario.</p>
+        </div>
+      ) : (
+        <form onSubmit={handlePlacement} className="space-y-4">
+          {isParlayAllowed && (
+            <div className="grid grid-cols-2 rounded-xl bg-[#0A0C0F] p-1 border border-white/5">
+              <button
+                type="button"
+                onClick={() => setBetType("simple")}
+                className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  currentBetType === "simple" ? "bg-white/5 text-white" : "text-[#8B93A1] hover:text-white"
+                }`}
+              >
+                Simples
+              </button>
+              <button
+                type="button"
+                onClick={() => setBetType("parlay")}
+                className={`py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                  currentBetType === "parlay" ? "bg-[#E8C34A] text-black" : "text-[#8B93A1] hover:text-white"
+                }`}
+              >
+                <Zap size={10} /> Combinada ({parlayOdds.toFixed(2)})
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-2.5 max-h-[220px] overflow-y-auto pr-1">
+            {betslip.map((item) => (
+              <div key={item.id} className="bg-[#0A0C0F] border border-white/5 rounded-xl p-3 relative group">
+                <button
+                  type="button"
+                  onClick={() => onRemove(item)}
+                  className="absolute top-2 right-2 text-[#8B93A1] hover:text-white opacity-60 group-hover:opacity-100 transition-opacity"
+                >
+                  <X size={13} />
+                </button>
+                <p className="text-[10px] text-[#8B93A1] font-semibold truncate max-w-[190px]">{item.gameName}</p>
+                <p className="text-white text-xs font-bold mt-0.5">{item.selectionName}</p>
+                <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-white/5">
+                  <span className="text-[9px] text-[#8B93A1] uppercase">{item.marketName}</span>
+                  <span className="text-[#E8C34A] font-bold text-xs">@{item.odd.toFixed(2)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-[#0A0C0F] border border-white/5 rounded-2xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] text-[#8B93A1] uppercase tracking-wider font-bold">Importe</label>
+              <span className="text-[10px] text-[#8B93A1]">Saldo: ${balance.toFixed(2)}</span>
+            </div>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8B93A1] text-sm font-bold">$</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0.10"
+                value={stake}
+                onChange={(e) => setStake(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-[#12151A] border border-white/5 focus:border-[#E8C34A] rounded-xl pl-7 pr-3 py-2.5 text-sm outline-none text-white font-bold"
+              />
+            </div>
+
+            {currentBetType === "simple" && betslip.length > 1 && (
+              <p className="text-[9px] text-[#8B93A1] mt-2 italic text-center">
+                * Importe por selección. Total: ${(numericStake * betslip.length).toFixed(2)}
+              </p>
+            )}
+
+            <div className="border-t border-white/5 mt-4 pt-3 space-y-2">
+              {currentBetType === "parlay" && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[#8B93A1]">Cuota Total:</span>
+                  <span className="text-[#E8C34A] font-bold">@{parlayOdds.toFixed(2)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-[#8B93A1]">Retorno Potencial:</span>
+                <span className="text-white font-bold">${potentialPayout.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-[#E07856] text-[11px] bg-[#E07856]/10 border border-[#E07856]/20 rounded-xl px-3 py-2">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            className="w-full bg-[#E8C34A] hover:bg-[#F2D16B] text-black font-bold py-3 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 uppercase tracking-wider"
+          >
+            <Landmark size={13} />
+            Colocar Apuesta
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+// ---------- Component: Detailed Game Markets Modal ----------
+function GameMarketsModal({ game, betslip, toggleSelection, onClose }) {
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-[#12151A] border border-white/5 rounded-3xl w-full max-w-lg p-6 max-h-[85vh] overflow-y-auto shadow-2xl relative animate-scaleUp">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-[#8B93A1] hover:text-white transition-colors bg-[#0A0C0F] border border-white/5 p-2 rounded-xl"
+        >
+          <X size={15} />
+        </button>
+
+        <div className="mb-6 pr-8">
+          <div className="flex items-center gap-2 mb-2">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+              game.status === 'live' ? 'bg-red-500/10 text-red-500 border border-red-500/20' : 'bg-white/5 text-[#8B93A1]'
+            }`}>
+              {game.status === 'live' ? 'VIVO' : 'PROGRAMADO'}
+            </span>
+            <span className="text-[#8B93A1] text-xs font-semibold">{game.time || game.date}</span>
+          </div>
+          <div className="flex flex-col gap-3 mt-4">
+            <div className="flex items-center gap-3">
+              {game.homeLogo ? (
+                <img src={game.homeLogo} alt={game.homeTeam} className="w-8 h-8 object-contain bg-white/10 p-1 rounded-lg border border-white/10" />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-[#E8C34A]/10 border border-[#E8C34A]/25 text-[#E8C34A] flex items-center justify-center text-xs font-bold">
+                  {game.homeTeam ? game.homeTeam.substring(0, 2).toUpperCase() : "H"}
+                </div>
+              )}
+              <span className="text-lg font-bold text-white">{game.homeTeam}</span>
+            </div>
+            
+            <div className="text-[#8B93A1] text-xs font-bold uppercase tracking-wider pl-1.5">vs</div>
+
+            <div className="flex items-center gap-3">
+              {game.awayLogo ? (
+                <img src={game.awayLogo} alt={game.awayTeam} className="w-8 h-8 object-contain bg-white/10 p-1 rounded-lg border border-white/10" />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-[#E8C34A]/10 border border-[#E8C34A]/25 text-[#E8C34A] flex items-center justify-center text-xs font-bold">
+                  {game.awayTeam ? game.awayTeam.substring(0, 2).toUpperCase() : "A"}
+                </div>
+              )}
+              <span className="text-lg font-bold text-white">{game.awayTeam}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {game.markets.map((market) => (
+            <div key={market.name} className="border-t border-white/5 pt-4">
+              <h4 className="text-xs text-[#8B93A1] font-bold uppercase tracking-wider mb-3">{market.name}</h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {market.options.map((opt) => {
+                  const isSelected = betslip.some(
+                    (item) => item.gameId === game.id && item.marketName === market.name && item.selectionName === opt.selection
+                  );
+                  return (
+                    <button
+                      key={opt.selection}
+                      onClick={() => toggleSelection(game, market, opt.selection, opt.odd)}
+                      className={`p-3 rounded-xl border text-left flex flex-col justify-between gap-1 transition-all ${
+                        isSelected
+                          ? "bg-[#E8C34A] border-[#E8C34A] text-black font-bold"
+                          : "bg-[#0A0C0F] border-white/5 text-white hover:border-[#E8C34A]"
+                      }`}
+                    >
+                      <span className="text-[10px] opacity-75 font-semibold truncate block w-full">{opt.selection}</span>
+                      <span className="text-sm font-bold block mt-1">@{opt.odd.toFixed(2)}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Component: Mis Apuestas (My Bets) Drawer ----------
+function MyBetsDrawer({ placedBets, onClose, onResolve }) {
+  const activeBets = placedBets.filter((b) => b.status === "active");
+  const settledBets = placedBets.filter((b) => b.status !== "active");
+
+  return (
+    <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex justify-end">
+      <div className="bg-[#0E1116] border-l border-white/5 w-full max-w-md h-full flex flex-col shadow-2xl relative animate-slideLeft">
+        <div className="p-5 border-b border-white/5 flex items-center justify-between bg-[#12151A]">
+          <div className="flex items-center gap-2">
+            <History className="text-[#E8C34A]" size={18} />
+            <h3 className="font-display text-2xl text-white tracking-wide">Mis Apuestas</h3>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-[#8B93A1] hover:text-white transition-colors bg-[#0A0C0F] border border-white/5 p-2 rounded-xl"
+          >
+            <X size={15} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-6">
+          {placedBets.length === 0 ? (
+            <div className="py-20 text-center text-[#8B93A1] text-xs">
+              <p>Aún no has realizado ninguna apuesta.</p>
+            </div>
+          ) : (
+            <>
+              {activeBets.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-xs text-[#8B93A1] uppercase tracking-wider font-bold">Apuestas Activas ({activeBets.length})</h4>
+                  {activeBets.map((bet) => (
+                    <div key={bet.id} className="bg-[#12151A] border border-white/5 rounded-2xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full font-bold uppercase">
+                          Pendiente
+                        </span>
+                        <span className="text-[#8B93A1] text-[10px]">{bet.date}</span>
+                      </div>
+
+                      <div className="space-y-2">
+                        {bet.selections.map((sel, idx) => (
+                          <div key={idx} className="border-l-2 border-[#E8C34A] pl-2 text-xs">
+                            <p className="text-white font-bold">{sel.selectionName} <span className="text-[#E8C34A] font-semibold">@{sel.odd.toFixed(2)}</span></p>
+                            <p className="text-[#8B93A1] text-[10px]">{sel.gameName} — {sel.marketName}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="border-t border-white/5 pt-2 flex items-center justify-between text-xs">
+                        <div>
+                          <p className="text-[#8B93A1] text-[10px]">Importe: ${bet.stake.toFixed(2)}</p>
+                          <p className="text-[#8B93A1] text-[10px]">Cuota total: @{bet.odds.toFixed(2)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-[#8B93A1] text-[10px]">Retorno:</p>
+                          <p className="text-white font-bold">${bet.payout.toFixed(2)}</p>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-white/5 pt-3 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => onResolve(bet.id, "won")}
+                          className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-[10px] font-bold py-1.5 rounded-lg border border-emerald-500/20 uppercase transition-all"
+                        >
+                          Simular Ganada
+                        </button>
+                        <button
+                          onClick={() => onResolve(bet.id, "lost")}
+                          className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[10px] font-bold py-1.5 rounded-lg border border-rose-500/20 uppercase transition-all"
+                        >
+                          Simular Perdida
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {settledBets.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-xs text-[#8B93A1] uppercase tracking-wider font-bold">Historial de Apuestas ({settledBets.length})</h4>
+                  {settledBets.map((bet) => {
+                    const isWon = bet.status === "won";
+                    return (
+                      <div key={bet.id} className="bg-[#12151A]/60 border border-white/5 rounded-2xl p-4 space-y-3 opacity-80">
+                        <div className="flex items-center justify-between">
+                          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                            isWon 
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25"
+                              : "bg-rose-500/10 text-rose-400 border border-rose-500/25"
+                          }`}>
+                            {isWon ? "Ganada" : "Perdida"}
+                          </span>
+                          <span className="text-[#8B93A1] text-[10px]">{bet.date}</span>
+                        </div>
+
+                        <div className="space-y-1 text-xs">
+                          {bet.selections.map((sel, idx) => (
+                            <div key={idx} className="pl-2 border-l border-white/10 text-[11px]">
+                              <p className="text-white font-bold">{sel.selectionName} @{sel.odd.toFixed(2)}</p>
+                              <p className="text-[#8B93A1] text-[9px]">{sel.gameName}</p>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="border-t border-white/5 pt-2 flex items-center justify-between text-xs">
+                          <div>
+                            <p className="text-[#8B93A1] text-[9px]">Importe: ${bet.stake.toFixed(2)}</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-[#8B93A1] text-[9px]">{isWon ? "Ganancia:" : "Retorno:"}</p>
+                            <p className={`font-bold ${isWon ? "text-emerald-400" : "text-[#8B93A1]"}`}>
+                              {isWon ? `+$${bet.payout.toFixed(2)}` : "$0.00"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Component: Mobile Betslip Drawer ----------
+function MobileBetslipDrawer({ betslip, balance, onRemove, onClear, onPlaceBet, onClose, success }) {
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end">
+      <div className="bg-[#12151A] w-full rounded-t-3xl p-5 max-h-[85vh] overflow-y-auto shadow-2xl relative animate-slideUp">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-[#8B93A1] hover:text-white transition-colors bg-[#0A0C0F] border border-white/5 p-2 rounded-xl"
+        >
+          <X size={15} />
+        </button>
+
+        <div className="mb-4">
+          <DesktopBetslip
+            betslip={betslip}
+            balance={balance}
+            onRemove={onRemove}
+            onClear={onClear}
+            onPlaceBet={onPlaceBet}
+            success={success}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Component: Admin Panel ----------
+function AdminPanel({ games, adminGames, setAdminGames, overriddenOdds, setOverriddenOdds, deletedGameIds, setDeletedGameIds }) {
+  const [activeTab, setActiveTab] = useState("list"); // 'list' | 'create'
+  
+  // Create Game Form States
+  const [sportId, setSportId] = useState("futbol");
+  const [homeTeam, setHomeTeam] = useState("");
+  const [awayTeam, setAwayTeam] = useState("");
+  const [status, setStatus] = useState("live");
+  const [score, setScore] = useState("0 - 0");
+  const [time, setTime] = useState("1'");
+  const [date, setDate] = useState("");
+  const [odds1, setOdds1] = useState("1.80");
+  const [oddsDraw, setOddsDraw] = useState("3.20");
+  const [odds2, setOdds2] = useState("2.50");
+  
+  const [feedback, setFeedback] = useState("");
+
+  // Odds editing state helper (temporary input memory)
+  const [editingOdds, setEditingOdds] = useState({});
+
+  // Handle game creation
+  function handleCreateGame(e) {
+    e.preventDefault();
+    if (!homeTeam || !awayTeam) {
+      setFeedback("Por favor completa los nombres de los equipos.");
+      return;
+    }
+
+    const gameId = `admin-game-${Date.now()}`;
+    
+    // Build main market options depending on sport
+    const markets = [];
+    if (sportId === "futbol" || sportId === "baseball") {
+      const options = [
+        { selection: `${homeTeam} (1)`, odd: parseFloat(odds1) || 1.80 },
+      ];
+      if (sportId === "futbol") {
+        options.push({ selection: "Empate (X)", odd: parseFloat(oddsDraw) || 3.20 });
+      }
+      options.push({ selection: `${awayTeam} (2)`, odd: parseFloat(odds2) || 2.50 });
+
+      markets.push({
+        name: sportId === "futbol" ? "Resultado Final (1X2)" : "Ganador del Encuentro",
+        options: options
+      });
+
+      // Default secondary markets
+      if (sportId === "futbol") {
+        markets.push({
+          name: "Ambos Equipos Anotan",
+          options: [
+            { selection: "Sí", odd: 1.85 },
+            { selection: "No", odd: 1.85 }
+          ]
+        });
+      }
+    } else if (sportId === "nba") {
+      markets.push({
+        name: "Ganador del Partido (Moneyline)",
+        options: [
+          { selection: homeTeam, odd: parseFloat(odds1) || 1.90 },
+          { selection: awayTeam, odd: parseFloat(odds2) || 1.90 }
+        ]
+      });
+      markets.push({
+        name: "Hándicap de Puntos",
+        options: [
+          { selection: `${homeTeam} -3.5`, odd: 1.90 },
+          { selection: `${awayTeam} +3.5`, odd: 1.90 }
+        ]
+      });
+    } else if (sportId === "ufc") {
+      markets.push({
+        name: "Ganador del Combate",
+        options: [
+          { selection: homeTeam, odd: parseFloat(odds1) || 1.80 },
+          { selection: awayTeam, odd: parseFloat(odds2) || 2.00 }
+        ]
+      });
+    }
+
+    const newGame = {
+      id: gameId,
+      sportId: sportId,
+      homeTeam: homeTeam,
+      awayTeam: awayTeam,
+      status: status,
+      score: status === "live" ? score : undefined,
+      time: status === "live" ? time : undefined,
+      date: status === "scheduled" ? (date || "Hoy") : "En Directo",
+      markets: markets
+    };
+
+    setAdminGames((prev) => [newGame, ...prev]);
+    setFeedback("¡Partido creado con éxito!");
+
+    // Sync to Supabase
+    if (supabase) {
+      supabase.from("admin_games").insert([{
+        id: gameId,
+        sport_id: sportId,
+        home_team: homeTeam,
+        away_team: awayTeam,
+        status: status,
+        score: status === "live" ? score : null,
+        time: status === "live" ? time : null,
+        date: status === "scheduled" ? (date || "Hoy") : "En Directo",
+        markets: markets
+      }]).then(({ error }) => {
+        if (error) console.error("Error saving game to Supabase:", error);
+      });
+    }
+    
+    // Clear form
+    setHomeTeam("");
+    setAwayTeam("");
+    setScore("0 - 0");
+    setTime("1'");
+    setDate("");
+    setOdds1("1.80");
+    setOddsDraw("3.20");
+    setOdds2("2.50");
+
+    setTimeout(() => {
+      setFeedback("");
+      setActiveTab("list");
+    }, 1500);
+  }
+
+  // Handle Score/Time modification
+  function handleUpdateGameMeta(gameId, scoreVal, timeVal) {
+    const isMock = MOCK_GAMES.some((g) => g.id === gameId);
+    
+    if (isMock) {
+      const mockGame = MOCK_GAMES.find((g) => g.id === gameId);
+      const cloned = { ...mockGame, score: scoreVal, time: timeVal, status: "live" };
+      setAdminGames((prev) => [...prev.filter((g) => g.id !== gameId), cloned]);
+
+      if (supabase) {
+        supabase.from("admin_games").upsert([{
+          id: gameId,
+          sport_id: mockGame.sportId,
+          home_team: mockGame.homeTeam,
+          away_team: mockGame.awayTeam,
+          status: "live",
+          score: scoreVal,
+          time: timeVal,
+          date: "En Directo",
+          markets: mockGame.markets
+        }]).then(({ error }) => {
+          if (error) console.error("Error upserting game override to Supabase:", error);
+        });
+      }
+    } else {
+      setAdminGames((prev) =>
+        prev.map((g) => (g.id === gameId ? { ...g, score: scoreVal, time: timeVal } : g))
+      );
+
+      if (supabase) {
+        supabase.from("admin_games").update({
+          score: scoreVal,
+          time: timeVal
+        }).eq("id", gameId).then(({ error }) => {
+          if (error) console.error("Error updating game meta in Supabase:", error);
+        });
+      }
+    }
+  }
+
+  // Handle Game Status Toggle (Live/Scheduled)
+  function handleToggleStatus(gameId, currentStatus) {
+    const nextStatus = currentStatus === "live" ? "scheduled" : "live";
+    const isMock = MOCK_GAMES.some((g) => g.id === gameId);
+
+    const nextScore = nextStatus === "live" ? "0 - 0" : undefined;
+    const nextTime = nextStatus === "live" ? "1'" : undefined;
+    const nextDate = nextStatus === "scheduled" ? "Hoy" : "En Directo";
+
+    if (isMock) {
+      const mockGame = MOCK_GAMES.find((g) => g.id === gameId);
+      const cloned = { 
+        ...mockGame, 
+        status: nextStatus,
+        score: nextScore,
+        time: nextTime,
+        date: nextDate
+      };
+      setAdminGames((prev) => [...prev.filter((g) => g.id !== gameId), cloned]);
+
+      if (supabase) {
+        supabase.from("admin_games").upsert([{
+          id: gameId,
+          sport_id: mockGame.sportId,
+          home_team: mockGame.homeTeam,
+          away_team: mockGame.awayTeam,
+          status: nextStatus,
+          score: nextScore || null,
+          time: nextTime || null,
+          date: nextDate,
+          markets: mockGame.markets
+        }]).then(({ error }) => {
+          if (error) console.error("Error upserting game status to Supabase:", error);
+        });
+      }
+    } else {
+      setAdminGames((prev) =>
+        prev.map((g) => 
+          g.id === gameId 
+            ? { 
+                ...g, 
+                status: nextStatus,
+                score: nextScore,
+                time: nextTime,
+                date: nextDate
+              } 
+            : g
+        )
+      );
+
+      if (supabase) {
+        supabase.from("admin_games").update({
+          status: nextStatus,
+          score: nextScore || null,
+          time: nextTime || null,
+          date: nextDate
+        }).eq("id", gameId).then(({ error }) => {
+          if (error) console.error("Error updating game status in Supabase:", error);
+        });
+      }
+    }
+  }
+
+  // Handle odd alteration save
+  function handleSaveOdd(gameId, marketName, selectionName) {
+    const key = `${gameId}-${marketName}-${selectionName}`;
+    const value = editingOdds[key];
+    if (value === undefined || isNaN(parseFloat(value))) return;
+
+    setOverriddenOdds((prev) => ({
+      ...prev,
+      [key]: parseFloat(value)
+    }));
+
+    // Trigger visual saving indicator
+    setEditingOdds((prev) => ({
+      ...prev,
+      [`${key}-saved`]: true
+    }));
+
+    if (supabase) {
+      supabase.from("overridden_odds").upsert([{
+        key: key,
+        odd: parseFloat(value)
+      }]).then(({ error }) => {
+        if (error) console.error("Error saving odd to Supabase:", error);
+      });
+    }
+
+    setTimeout(() => {
+      setEditingOdds((prev) => {
+        const copy = { ...prev };
+        delete copy[`${key}-saved`];
+        return copy;
+      });
+    }, 1500);
+  }
+
+  // Handle Match Deletion
+  function handleDeleteGame(gameId) {
+    const isMock = MOCK_GAMES.some((g) => g.id === gameId);
+    if (isMock) {
+      setDeletedGameIds((prev) => [...prev, gameId]);
+      if (supabase) {
+        supabase.from("deleted_game_ids").upsert([{ id: gameId }]).then(({ error }) => {
+          if (error) console.error("Error saving deleted game ID to Supabase:", error);
+        });
+      }
+    } else {
+      setAdminGames((prev) => prev.filter((g) => g.id !== gameId));
+      if (supabase) {
+        supabase.from("admin_games").delete().eq("id", gameId).then(({ error }) => {
+          if (error) console.error("Error deleting game from Supabase:", error);
+        });
+      }
+    }
+  }
+
+  // Reset all overrides
+  function handleResetAll() {
+    if (window.confirm("¿Seguro que quieres borrar todas las modificaciones, partidos creados y restaurar la base original?")) {
+      setAdminGames([]);
+      setOverriddenOdds({});
+      setDeletedGameIds([]);
+
+      if (supabase) {
+        Promise.all([
+          supabase.from("admin_games").delete().neq("id", ""),
+          supabase.from("overridden_odds").delete().neq("key", ""),
+          supabase.from("deleted_game_ids").delete().neq("id", "")
+        ]).then((results) => {
+          const errors = results.filter(r => r.error);
+          if (errors.length > 0) {
+            console.error("Errors resetting database:", errors);
+          }
+        });
+      }
+    }
+  }
+
+  return (
+    <div className="flex-1 w-full bg-[#12151A] border border-white/5 rounded-3xl p-6 shadow-2xl">
+      <div className="flex flex-wrap items-center justify-between border-b border-white/5 pb-4 mb-6 gap-4">
+        <div>
+          <h2 className="font-display text-3xl text-[#E8C34A] leading-none tracking-wide">Panel de Administración de Líneas</h2>
+          <p className="text-[#8B93A1] text-xs mt-1">Modifica cuotas, marcadores y partidos en tiempo real.</p>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab("list")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === "list" ? "bg-[#E8C34A] text-black" : "bg-black/30 text-[#8B93A1] hover:text-white"
+            }`}
+          >
+            Gestionar Partidos
+          </button>
+          <button
+            onClick={() => setActiveTab("create")}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+              activeTab === "create" ? "bg-[#E8C34A] text-black" : "bg-black/30 text-[#8B93A1] hover:text-white"
+            }`}
+          >
+            <Plus size={14} /> Crear Partido
+          </button>
+          <button
+            onClick={handleResetAll}
+            className="px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/25 rounded-xl text-xs font-bold transition-all"
+            title="Restaurar valores de fábrica"
+          >
+            Restaurar
+          </button>
+        </div>
+      </div>
+
+      {activeTab === "create" ? (
+        // FORM: Create New Game
+        <form onSubmit={handleCreateGame} className="max-w-xl space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] text-[#8B93A1] mb-2 uppercase font-bold tracking-wider">Deporte</label>
+              <select
+                value={sportId}
+                onChange={(e) => setSportId(e.target.value)}
+                className="w-full bg-[#0A0C0F] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:border-[#E8C34A]"
+              >
+                {SPORTS.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] text-[#8B93A1] mb-2 uppercase font-bold tracking-wider">Estado del Partido</label>
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full bg-[#0A0C0F] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:border-[#E8C34A]"
+              >
+                <option value="live">En Directo (En Vivo)</option>
+                <option value="scheduled">Programado</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] text-[#8B93A1] mb-2 uppercase font-bold tracking-wider">Equipo Local / Competidor 1</label>
+              <input
+                type="text"
+                value={homeTeam}
+                onChange={(e) => setHomeTeam(e.target.value)}
+                placeholder="Ej. Golden State Warriors"
+                className="w-full bg-[#0A0C0F] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:border-[#E8C34A]"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] text-[#8B93A1] mb-2 uppercase font-bold tracking-wider">Equipo Visitante / Competidor 2</label>
+              <input
+                type="text"
+                value={awayTeam}
+                onChange={(e) => setAwayTeam(e.target.value)}
+                placeholder="Ej. Miami Heat"
+                className="w-full bg-[#0A0C0F] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:border-[#E8C34A]"
+              />
+            </div>
+          </div>
+
+          {status === "live" ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] text-[#8B93A1] mb-2 uppercase font-bold tracking-wider">Marcador Actual</label>
+                <input
+                  type="text"
+                  value={score}
+                  onChange={(e) => setScore(e.target.value)}
+                  placeholder="Ej. 102 - 99"
+                  className="w-full bg-[#0A0C0F] border border-white/10 rounded-xl px-4 py-3 text-sm text-center outline-none text-white focus:border-[#E8C34A]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-[#8B93A1] mb-2 uppercase font-bold tracking-wider">Minuto / Tiempo en Vivo</label>
+                <input
+                  type="text"
+                  value={time}
+                  onChange={(e) => setTime(e.target.value)}
+                  placeholder="Ej. 4Q 5:12 o 74'"
+                  className="w-full bg-[#0A0C0F] border border-white/10 rounded-xl px-4 py-3 text-sm text-center outline-none text-white focus:border-[#E8C34A]"
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[10px] text-[#8B93A1] mb-2 uppercase font-bold tracking-wider">Fecha / Hora programada</label>
+              <input
+                type="text"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                placeholder="Ej. 15 de Julio, 20:30"
+                className="w-full bg-[#0A0C0F] border border-white/10 rounded-xl px-4 py-3 text-sm outline-none text-white focus:border-[#E8C34A]"
+              />
+            </div>
+          )}
+
+          {/* Form Odds section based on selected Sport */}
+          <div className="bg-[#0A0C0F] p-4 border border-white/5 rounded-2xl space-y-4">
+            <h4 className="text-white text-xs font-bold uppercase tracking-wider">Cuotas Iniciales del Mercado Principal</h4>
+            
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[9px] text-[#8B93A1] mb-1 text-center font-bold">Cuota 1 (Local)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={odds1}
+                  onChange={(e) => setOdds1(e.target.value)}
+                  className="w-full bg-[#12151A] border border-white/10 rounded-xl py-2 text-center text-sm font-bold text-white focus:border-[#E8C34A]"
+                />
+              </div>
+
+              {sportId === "futbol" && (
+                <div>
+                  <label className="block text-[9px] text-[#8B93A1] mb-1 text-center font-bold">Cuota X (Empate)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={oddsDraw}
+                    onChange={(e) => setOddsDraw(e.target.value)}
+                    className="w-full bg-[#12151A] border border-white/10 rounded-xl py-2 text-center text-sm font-bold text-white focus:border-[#E8C34A]"
+                  />
+                </div>
+              )}
+
+              <div className="offset-draw">
+                <label className="block text-[9px] text-[#8B93A1] mb-1 text-center font-bold">Cuota 2 (Visitante)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={odds2}
+                  onChange={(e) => setOdds2(e.target.value)}
+                  className="w-full bg-[#12151A] border border-white/10 rounded-xl py-2 text-center text-sm font-bold text-white focus:border-[#E8C34A]"
+                />
+              </div>
+            </div>
+          </div>
+
+          {feedback && (
+            <p className="text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-4 py-2.5 rounded-xl text-xs font-semibold text-center animate-fadeIn">
+              {feedback}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            className="w-full bg-[#E8C34A] hover:bg-[#F2D16B] text-black font-bold py-3.5 rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5 uppercase tracking-wider"
+          >
+            <Plus size={14} />
+            Crear y Registrar Partido
+          </button>
+        </form>
+      ) : (
+        // LIST: Modify Odds and Scores
+        <div className="space-y-6">
+          {games.length === 0 ? (
+            <div className="text-center py-10 text-[#8B93A1] text-xs">
+              No hay partidos registrados. ¡Prueba a crear uno!
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {games.map((game) => {
+                const sport = SPORTS.find((s) => s.id === game.sportId);
+                return (
+                  <div key={game.id} className="bg-[#0A0C0F] border border-white/5 rounded-2xl p-5 space-y-4">
+                    {/* Game header meta controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 pb-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-white text-xs font-bold uppercase tracking-wider bg-white/5 px-2.5 py-1 rounded-xl">
+                          {sport?.name || game.sportId}
+                        </span>
+                        {game.isApi && (
+                          <span className="bg-[#E8C34A]/10 border border-[#E8C34A]/30 text-[#E8C34A] text-[9px] font-bold px-2 py-0.5 rounded-full">
+                            API-SPORTS
+                          </span>
+                        )}
+                        <button
+                          onClick={() => handleToggleStatus(game.id, game.status)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
+                            game.status === "live"
+                              ? "bg-red-500/10 text-red-500 border-red-500/25"
+                              : "bg-white/5 text-[#8B93A1] border-white/10 hover:border-white/20"
+                          }`}
+                        >
+                          {game.status === "live" ? "🔴 En Vivo" : "🗓️ Programado"}
+                        </button>
+                      </div>
+
+                      <button
+                        onClick={() => handleDeleteGame(game.id)}
+                        className="text-rose-400 hover:text-rose-500 p-1.5 hover:bg-rose-500/10 rounded-xl transition-all"
+                        title="Eliminar Partido"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+
+                    {/* Match Score & Time controls */}
+                    <div className="flex flex-wrap items-center justify-between gap-4">
+                      <div className="flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          {game.homeLogo ? (
+                            <img src={game.homeLogo} alt={game.homeTeam} className="w-5 h-5 object-contain bg-white/10 p-0.5 rounded border border-white/10" />
+                          ) : (
+                            <div className="w-5 h-5 rounded bg-[#E8C34A]/10 border border-[#E8C34A]/25 text-[#E8C34A] flex items-center justify-center text-[8px] font-bold">
+                              {game.homeTeam ? game.homeTeam.substring(0, 2).toUpperCase() : "H"}
+                            </div>
+                          )}
+                          <span className="text-sm font-bold text-white">{game.homeTeam}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {game.awayLogo ? (
+                            <img src={game.awayLogo} alt={game.awayTeam} className="w-5 h-5 object-contain bg-white/10 p-0.5 rounded border border-white/10" />
+                          ) : (
+                            <div className="w-5 h-5 rounded bg-[#E8C34A]/10 border border-[#E8C34A]/25 text-[#E8C34A] flex items-center justify-center text-[8px] font-bold">
+                              {game.awayTeam ? game.awayTeam.substring(0, 2).toUpperCase() : "A"}
+                            </div>
+                          )}
+                          <span className="text-sm font-bold text-white">{game.awayTeam}</span>
+                        </div>
+                      </div>
+
+                      {game.status === "live" && (
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-[#8B93A1] uppercase font-bold">Marcador:</span>
+                            <input
+                              type="text"
+                              defaultValue={game.score}
+                              onBlur={(e) => handleUpdateGameMeta(game.id, e.target.value, game.time)}
+                              placeholder="0 - 0"
+                              className="w-16 bg-[#12151A] border border-white/10 rounded-lg py-1 text-center text-xs font-bold text-[#E8C34A] focus:border-[#E8C34A] outline-none"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-[#8B93A1] uppercase font-bold">Tiempo:</span>
+                            <input
+                              type="text"
+                              defaultValue={game.time}
+                              onBlur={(e) => handleUpdateGameMeta(game.id, game.score, e.target.value)}
+                              placeholder="74'"
+                              className="w-16 bg-[#12151A] border border-white/10 rounded-lg py-1 text-center text-xs font-bold text-[#E8C34A] focus:border-[#E8C34A] outline-none"
+                            />
+                          </div>
+                          <span className="text-[9px] text-[#8B93A1] italic">(Se guarda al salir del campo)</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Odds Editor Grid */}
+                    <div className="space-y-4 pt-2">
+                      <p className="text-[10px] text-[#8B93A1] font-bold uppercase tracking-wider">Alterar Cuotas Decimales:</p>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {game.markets.map((market) => (
+                          <div key={market.name} className="bg-[#12151A]/60 border border-white/5 rounded-xl p-3">
+                            <p className="text-[10px] text-[#8B93A1] font-bold mb-2 uppercase">{market.name}</p>
+                            
+                            <div className="space-y-2">
+                              {market.options.map((opt) => {
+                                const key = `${game.id}-${market.name}-${opt.selection}`;
+                                const isSaved = editingOdds[`${key}-saved`];
+                                return (
+                                  <div key={opt.selection} className="flex items-center justify-between gap-2 bg-black/30 p-1.5 rounded-lg border border-white/5">
+                                    <span className="text-[11px] text-[#8B93A1] truncate max-w-[120px]" title={opt.selection}>
+                                      {opt.selection}
+                                    </span>
+                                    
+                                    <div className="flex items-center gap-1">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="1.01"
+                                        value={editingOdds[key] !== undefined ? editingOdds[key] : opt.odd.toFixed(2)}
+                                        onChange={(e) => setEditingOdds((prev) => ({ ...prev, [key]: e.target.value }))}
+                                        className="w-16 bg-[#0A0C0F] border border-white/10 focus:border-[#E8C34A] rounded-lg py-1 px-1.5 text-center text-xs font-bold text-white outline-none"
+                                      />
+                                      <button
+                                        onClick={() => handleSaveOdd(game.id, market.name, opt.selection)}
+                                        className={`p-1 rounded-lg transition-all border flex items-center justify-center ${
+                                          isSaved 
+                                            ? "bg-emerald-500 border-emerald-500 text-black"
+                                            : "bg-[#E8C34A]/10 border-[#E8C34A]/25 text-[#E8C34A] hover:bg-[#E8C34A] hover:text-black"
+                                        }`}
+                                        title="Aplicar Cuota"
+                                      >
+                                        {isSaved ? <Check size={12} /> : <Edit3 size={12} />}
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}

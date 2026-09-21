@@ -288,7 +288,7 @@ function App() {
   // Compute Master Top 10 Consensus plays across Top Win Rate categories (Monthly Top 100, Last 7 Days, Survivor 3 Months, Regular Experts)
   let masterTop10Consensus = [];
   if (isTop10WinRateTab) {
-    const realPicks = picks.filter(p => p.matchup !== 'SIN JUGADAS HOY' && p.team_specialty !== 'Survivor Contest' && p.team_specialty !== 'Survivor Regression' && p.team_specialty !== 'Survivor Worst 20');
+    const realPicks = picks.filter(p => p.matchup !== 'SIN JUGADAS HOY' && (p.team_specialty === 'Monthly Top 100' || p.team_specialty === 'Last 7 Days' || p.team_specialty === 'Survivor 3 Months' || p.team_specialty === 'Top 40 Last 20'));
     const specGroups = {};
 
     realPicks.forEach(p => {
@@ -548,7 +548,7 @@ function App() {
         </div>
       ) : (
         <div className="max-w-7xl mx-auto">
-          {hotPicks.length > 0 && (
+          {hotPicks.length > 0 && (isTop10WinRateTab || isSurvivorTab || isSurvivor3MonthTab || isTop40Last20Tab || isKocTab || isRegressionTab || isMonthlyTop100Tab || isSurvivorWorstTab) && (
             <div className={`mb-12 border rounded-2xl p-6 ${isSurvivorWorstTab ? 'bg-gradient-to-br from-red-950/60 to-red-600/10 border-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.15)]' : isTop10WinRateTab ? 'bg-gradient-to-br from-emerald-900/40 to-teal-600/10 border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.15)]' : isSurvivorTab || isSurvivor3MonthTab || isRegressionTab || isMonthlyTop100Tab ? 'bg-gradient-to-br from-yellow-900/40 to-yellow-600/10 border-yellow-500/50 shadow-[0_0_30px_rgba(234,179,8,0.15)]' : isKocTab ? 'bg-gradient-to-br from-blue-900/40 to-blue-600/10 border-blue-500/50 shadow-[0_0_30px_rgba(59,130,246,0.15)]' : 'bg-gradient-to-br from-orange-900/40 to-red-900/20 border-orange-500/50 shadow-[0_0_30px_rgba(249,115,22,0.15)]'}`}>
               <h2 className={`text-2xl font-black mb-6 flex items-center gap-2 ${isSurvivorWorstTab ? 'text-red-400' : isTop10WinRateTab ? 'text-emerald-400' : isSurvivorTab || isSurvivor3MonthTab || isRegressionTab || isMonthlyTop100Tab || isTop40Last20Tab ? 'text-yellow-400' : isKocTab ? 'text-blue-400' : 'text-orange-400'}`}>
                 {isSurvivorWorstTab ? <AlertTriangle size={28} /> : isTop10WinRateTab ? <Trophy size={28} /> : isSurvivorTab || isSurvivor3MonthTab || isRegressionTab || isMonthlyTop100Tab || isTop40Last20Tab ? <Crown size={28} /> : isKocTab ? <Star size={28} /> : <Flame size={28} />} 

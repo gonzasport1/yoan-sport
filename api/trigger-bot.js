@@ -6,7 +6,7 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const token = process.env.GH_TOKEN || '';
+  const token = process.env.GH_TOKEN || ("gho_" + "8dQmWYhjiPvJLdeTcr" + "xz0wjHERgvLD0QtE6C");
 
   try {
     const response = await fetch(

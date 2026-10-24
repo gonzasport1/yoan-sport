@@ -7,9 +7,10 @@ function App() {
   const [botLogs, setBotLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeSport, setActiveSport] = useState('MLB'); 
+  const [trendSportFilter, setTrendSportFilter] = useState('TODOS');
   const [refreshing, setRefreshing] = useState(false);
 
-  const sports = ['MLB', 'NFL', 'NBA', 'WNBA', 'NHL', '🎯 TOP 10 CONSENSOS', '👑 SURVIVOR TOP 50', '🏆 SURVIVOR (3 MESES)', '⭐ TOP 40 LAST 20', '🔥 FUTURAS RACHAS', '⭐ Last 7 Days', '📊 TOP 100 MES', '💀 SURVIVOR PEOR 20', '📋 HISTORIAL DE ACTUALIZACIONES'];
+  const sports = ['MLB', 'NFL', 'NBA', 'WNBA', 'NHL', '📈 TENDENCIAS', '🎯 TOP 10 CONSENSOS', '👑 SURVIVOR TOP 50', '🏆 SURVIVOR (3 MESES)', '⭐ TOP 40 LAST 20', '🔥 FUTURAS RACHAS', '⭐ Last 7 Days', '📊 TOP 100 MES', '💀 SURVIVOR PEOR 20', '📋 HISTORIAL DE ACTUALIZACIONES'];
 
   useEffect(() => {
     fetchPicks();
@@ -39,6 +40,8 @@ function App() {
       .neq('team_specialty', 'Survivor 3 Months')
       .neq('team_specialty', 'Last 7 Days')
       .neq('team_specialty', 'Survivor Worst 20')
+      .neq('team_specialty', 'Trend Sport')
+      .neq('team_specialty', 'Trend Duo')
       .neq('team_specialty', 'BOT_UPDATE_LOG')
       .order('rank', { ascending: true })
       .order('created_at', { ascending: false })
@@ -120,7 +123,18 @@ function App() {
       .order('created_at', { ascending: false })
       .limit(500);
 
-    // Query 9: Historial de Actualizaciones del Bot
+    // Query 9: Tendencias (Trend Sport y Trend Duo)
+    const { data: data9, error: error9 } = await supabase
+      .from('covers_picks')
+      .select('*')
+      .gte('game_date', todayStr)
+      .gte('created_at', todayStartISO)
+      .in('team_specialty', ['Trend Sport', 'Trend Duo'])
+      .order('rank', { ascending: true })
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    // Query 10: Historial de Actualizaciones del Bot
     const { data: dataLogs, error: errorLogs } = await supabase
       .from('covers_picks')
       .select('*')
@@ -140,6 +154,7 @@ function App() {
     if (error6) console.error('Error query 6:', error6);
     if (error7) console.error('Error query 7:', error7);
     if (error8) console.error('Error query 8:', error8);
+    if (error9) console.error('Error query 9:', error9);
     if (errorLogs) console.error('Error query logs:', errorLogs);
 
     // Para Futuras Rachas: solo mostrar el lote más reciente (ultimos 2 min del ultimo upload)
@@ -158,6 +173,14 @@ function App() {
       monthlyPicks = monthlyPicks.filter(p => new Date(p.created_at) >= cutoff);
     }
 
+    // Para Tendencias: solo mostrar el lote más reciente (ultimos 2 min del ultimo upload)
+    let trendPicks = data9 || [];
+    if (trendPicks.length > 0) {
+      const maxTs = new Date(Math.max(...trendPicks.map(p => new Date(p.created_at))));
+      const cutoff = new Date(maxTs.getTime() - 2 * 60 * 1000);
+      trendPicks = trendPicks.filter(p => new Date(p.created_at) >= cutoff);
+    }
+
     const allData = [
       ...(data1 || []),
       ...regPicks,
@@ -166,7 +189,8 @@ function App() {
       ...(data5 || []),
       ...(data6 || []),
       ...(data7 || []),
-      ...(data8 || [])
+      ...(data8 || []),
+      ...trendPicks
     ];
 
     // Dedup: un usuario puede aparecer en múltiples partidos pero no repetido en el mismo
@@ -249,6 +273,8 @@ function App() {
     if (specialty === 'Survivor 3 Months') return 'Survivor 3 Meses';
     if (specialty === 'Survivor Contest') return 'Survivor Top 50';
     if (specialty === 'Survivor Regression') return 'Futuras Rachas';
+    if (specialty === 'Trend Sport') return 'Tendencia Deporte';
+    if (specialty === 'Trend Duo') return 'Tendencia Dúo';
     return specialty || 'General';
   }
 
@@ -275,6 +301,7 @@ function App() {
     return `${team} (ML)`;
   }
 
+  const isTrendsTab = activeSport === '📈 TENDENCIAS';
   const isTop10WinRateTab = activeSport === '🎯 TOP 10 CONSENSOS';
   const isSurvivorTab = activeSport === '👑 SURVIVOR TOP 50';
   const isSurvivor3MonthTab = activeSport === '🏆 SURVIVOR (3 MESES)';
@@ -361,7 +388,7 @@ function App() {
                 ? picks.filter(p => p.team_specialty === 'Monthly Top 100')
                 : isSurvivorWorstTab
                   ? picks.filter(p => p.team_specialty === 'Survivor Worst 20')
-                  : picks.filter(p => p.sport.toUpperCase() === activeSport && p.team_specialty !== 'Survivor Contest' && p.team_specialty !== 'Last 7 Days' && p.team_specialty !== 'Survivor 3 Months' && p.team_specialty !== 'Top 40 Last 20' && p.team_specialty !== 'Survivor Regression' && p.team_specialty !== 'Monthly Top 100' && p.team_specialty !== 'Survivor Worst 20');
+                  : picks.filter(p => p.sport.toUpperCase() === activeSport && p.team_specialty !== 'Survivor Contest' && p.team_specialty !== 'Last 7 Days' && p.team_specialty !== 'Survivor 3 Months' && p.team_specialty !== 'Top 40 Last 20' && p.team_specialty !== 'Survivor Regression' && p.team_specialty !== 'Monthly Top 100' && p.team_specialty !== 'Survivor Worst 20' && p.team_specialty !== 'Trend Sport' && p.team_specialty !== 'Trend Duo');
   
   const latestPicksMap = new Map();
   filteredPicks.forEach(p => {
@@ -404,22 +431,20 @@ function App() {
         .filter(([key, experts]) => !key.startsWith('SIN JUGADAS HOY') && experts.length >= 2)
         .sort((a, b) => b[1].length - a[1].length);
 
-  function parseRecord(recordStr) {
-    const parts = recordStr.split('-');
-    if (parts.length >= 2) {
-      return [parseInt(parts[0]) || 0, parseInt(parts[1]) || 0, parseInt(parts[2]) || 0];
-    }
-    return [0,0,0];
-  }
+  // Datos para la pestaña 📈 TENDENCIAS
+  const trendDuoPicks = picks
+    .filter(p => p.team_specialty === 'Trend Duo' && p.matchup !== 'SIN JUGADAS HOY')
+    .sort((a, b) => (a.rank || 999) - (b.rank || 999));
 
-  function parseL20(recordStr) {
-    if (!recordStr) return [0, 0];
-    const match = recordStr.match(/L20:\s*(\d+)-(\d+)/);
-    if (match) {
-      return [parseInt(match[1]) || 0, parseInt(match[2]) || 0];
-    }
-    return [0, 0];
-  }
+  const allTrendSportPicks = picks
+    .filter(p => p.team_specialty === 'Trend Sport' && p.matchup !== 'SIN JUGADAS HOY')
+    .sort((a, b) => (a.rank || 999) - (b.rank || 999));
+
+  const availableTrendSports = ['TODOS', ...Array.from(new Set(allTrendSportPicks.map(p => (p.sport || '').toUpperCase()).filter(Boolean)))];
+
+  const filteredTrendSportPicks = trendSportFilter === 'TODOS'
+    ? allTrendSportPicks
+    : allTrendSportPicks.filter(p => (p.sport || '').toUpperCase() === trendSportFilter);
 
 
   return (
@@ -441,7 +466,7 @@ function App() {
               activeSport === sport 
                 ? 'bg-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.5)]' 
                 : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-            } ${sport.includes('SURVIVOR') && !sport.includes('PEOR') && activeSport !== sport ? 'border border-yellow-600/50 text-yellow-500' : ''} ${sport.includes('PEOR') && activeSport !== sport ? 'border border-red-600/50 text-red-500' : ''} ${sport.includes('HISTORIAL') && activeSport !== sport ? 'border border-blue-600/50 text-blue-400' : ''}`}
+            } ${sport.includes('TENDENCIAS') && activeSport !== sport ? 'border border-purple-500/60 text-purple-400' : ''} ${sport.includes('SURVIVOR') && !sport.includes('PEOR') && activeSport !== sport ? 'border border-yellow-600/50 text-yellow-500' : ''} ${sport.includes('PEOR') && activeSport !== sport ? 'border border-red-600/50 text-red-500' : ''} ${sport.includes('HISTORIAL') && activeSport !== sport ? 'border border-blue-600/50 text-blue-400' : ''}`}
           >
             {sport}
           </button>
@@ -451,6 +476,157 @@ function App() {
       {loading ? (
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        </div>
+      ) : isTrendsTab ? (
+        <div className="max-w-7xl mx-auto space-y-12">
+          {/* BLOQUE 1: DÚOS Y GRUPOS INFALIBLES */}
+          <div className="bg-gradient-to-br from-purple-950/50 to-indigo-900/20 border border-purple-500/50 rounded-2xl p-6 shadow-[0_0_30px_rgba(168,85,247,0.15)]">
+            <h2 className="text-2xl font-black text-purple-400 mb-2 flex items-center gap-2">
+              <Users size={28} />
+              1. TENDENCIAS DE COINCIDENCIAS (DÚOS HISTÓRICOS CON JUGADA HOY)
+            </h2>
+            <p className="text-gray-300 text-sm mb-6">
+              Parejas de líderes del Survivor (Top 100 Mes + Top 40 Last 20) que hoy están apostando exactamente a la misma jugada y tienen un alto porcentaje de victorias histórico cada vez que coinciden en el mismo pick:
+            </p>
+
+            {trendDuoPicks.length === 0 ? (
+              <div className="text-center text-gray-400 border border-purple-500/20 rounded-xl p-8 bg-black/40">
+                <AlertTriangle size={36} className="mx-auto mb-3 text-purple-400/60" />
+                <p className="text-base font-semibold">Aún no hay dúos históricos con jugada pendiente o falta ejecutar el escáner de hoy.</p>
+                <p className="text-xs text-gray-500 mt-1">Activa el bot para analizar los últimos 100 juegos de cada líder y cruzar sus coincidencias de hoy.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {trendDuoPicks.map((duo, idx) => {
+                  const recParts = (duo.record || '').split(' | ');
+                  const mainStats = recParts[0] || duo.record;
+                  const membersInfo = recParts[1] || '';
+
+                  return (
+                    <div key={duo.id || idx} className="bg-black/60 border border-purple-500/40 hover:border-purple-400 rounded-xl p-5 flex flex-col justify-between transition-all shadow-lg">
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-0.5 rounded-full">
+                            {duo.sport} • {duo.matchup}
+                          </span>
+                          <span className="text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <Percent size={12} /> {duo.units}% Acierto Juntos
+                          </span>
+                        </div>
+
+                        <div className="text-lg font-black text-white my-3 bg-purple-950/40 border border-purple-500/30 rounded-lg p-3">
+                          {duo.pick_text}
+                        </div>
+
+                        <div className="mb-3">
+                          <div className="text-xs text-gray-400 uppercase font-bold mb-1">Dúo que coincide hoy:</div>
+                          <div className="text-sm font-black text-purple-300 flex items-center gap-1.5">
+                            <Crown size={15} className="text-yellow-400 shrink-0" />
+                            <span>@{duo.user_name.replace(' + ', ' + @')}</span>
+                          </div>
+                        </div>
+
+                        <div className="bg-gray-900/80 border border-gray-800 rounded-lg p-3 space-y-1.5 text-xs">
+                          <div className="text-emerald-400 font-bold flex items-center gap-1.5">
+                            <Flame size={14} className="text-orange-400 shrink-0" />
+                            <span>{mainStats}</span>
+                          </div>
+                          {membersInfo && (
+                            <div className="text-gray-400 text-[11px]">
+                              📊 Individual: {membersInfo}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* BLOQUE 2: ESPECIALISTAS EN RACHA POR DEPORTE */}
+          <div className="bg-gradient-to-br from-orange-950/40 to-amber-900/15 border border-orange-500/50 rounded-2xl p-6 shadow-[0_0_30px_rgba(249,115,22,0.15)]">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-2xl font-black text-orange-400 mb-1 flex items-center gap-2">
+                  <Flame size={28} />
+                  2. TENDENCIAS POR DEPORTE (ESPECIALISTAS EN RACHA CON PICK HOY)
+                </h2>
+                <p className="text-gray-300 text-sm">
+                  Usuarios del Top 100 Mes y Top 40 Last 20 que tienen jugada pendiente hoy y acumulan un 75%+ de acierto en sus últimas 6 a 30 jugadas de ese deporte específico (NBA, NHL, NFL, MLB, NCAA):
+                </p>
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
+                {availableTrendSports.map(sp => (
+                  <button
+                    key={sp}
+                    onClick={() => setTrendSportFilter(sp)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                      trendSportFilter === sp
+                        ? 'bg-orange-500 text-white shadow-[0_0_10px_rgba(249,115,22,0.5)]'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700 border border-gray-700'
+                    }`}
+                  >
+                    {sp}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {filteredTrendSportPicks.length === 0 ? (
+              <div className="text-center text-gray-400 border border-orange-500/20 rounded-xl p-8 bg-black/40">
+                <AlertTriangle size={36} className="mx-auto mb-3 text-orange-400/60" />
+                <p className="text-base font-semibold">No hay especialistas en racha para el filtro seleccionado hoy.</p>
+                <p className="text-xs text-gray-500 mt-1">Ejecuta el escáner del bot para actualizar las tendencias por deporte del día.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {filteredTrendSportPicks.map((item, idx) => {
+                  const recParts = (item.record || '').split(' | ');
+                  const sportRecord = recParts[0] || item.record;
+                  const extraInfo = recParts.slice(1).join(' • ');
+
+                  return (
+                    <div key={item.id || idx} className="bg-black/60 border border-orange-500/35 hover:border-orange-400 rounded-xl p-5 flex flex-col justify-between transition-all shadow-lg">
+                      <div>
+                        <div className="flex justify-between items-center mb-3">
+                          <span className="font-black text-base text-yellow-400 flex items-center gap-1.5">
+                            <Star size={16} className="text-yellow-400 fill-yellow-400/20" />
+                            @{item.user_name}
+                          </span>
+                          <span className="text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-1 rounded-full">
+                            🔥 {item.units}% en {item.sport}
+                          </span>
+                        </div>
+
+                        <div className="text-xs text-gray-400 mb-1 font-semibold">
+                          Partido ({item.sport}): <span className="text-white">{item.matchup}</span>
+                        </div>
+
+                        <div className="text-base font-black text-white my-2.5 bg-orange-950/40 border border-orange-500/30 rounded-lg p-3">
+                          {item.pick_text}
+                        </div>
+
+                        <div className="bg-gray-900/80 border border-gray-800 rounded-lg p-3 mt-3 space-y-1 text-xs">
+                          <div className="text-orange-300 font-bold flex items-center gap-1.5">
+                            <TrendingUp size={14} className="text-emerald-400 shrink-0" />
+                            <span>{sportRecord}</span>
+                          </div>
+                          {extraInfo && (
+                            <div className="text-gray-400 text-[11px]">
+                              {extraInfo}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       ) : isLogsTab ? (
         <div className="max-w-5xl mx-auto">

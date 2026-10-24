@@ -486,7 +486,7 @@ function App() {
               1. TENDENCIAS DE COINCIDENCIAS (DÚOS HISTÓRICOS CON JUGADA HOY)
             </h2>
             <p className="text-gray-300 text-sm mb-6">
-              Parejas de líderes del Survivor (Top 100 Mes + Top 40 Last 20) que hoy están apostando exactamente a la misma jugada y tienen un alto porcentaje de victorias histórico cada vez que coinciden en el mismo pick:
+              Parejas de líderes (Survivor Top 100 Mes + Top 40 Last 20 + Last 7 Days) que hoy están apostando exactamente a la misma jugada y tienen un alto porcentaje de victorias histórico cada vez que coinciden en el mismo pick:
             </p>
 
             {trendDuoPicks.length === 0 ? (
@@ -554,7 +554,7 @@ function App() {
                   2. TENDENCIAS POR DEPORTE (ESPECIALISTAS EN RACHA CON PICK HOY)
                 </h2>
                 <p className="text-gray-300 text-sm">
-                  Usuarios del Top 100 Mes y Top 40 Last 20 que tienen jugada pendiente hoy y acumulan un 75%+ de acierto en sus últimas 6 a 30 jugadas de ese deporte específico (NBA, NHL, NFL, MLB, NCAA):
+                  Usuarios del Top 100 Mes, Top 40 Last 20 y Last 7 Days que tienen jugada pendiente hoy y acumulan un 75%+ de acierto en sus últimas 6 a 30 jugadas de ese deporte específico (NBA, NHL, NFL, MLB, NCAA):
                 </p>
               </div>
 
